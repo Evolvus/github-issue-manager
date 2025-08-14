@@ -80,6 +80,19 @@ function initials(str = "?") {
   return (first + last).toUpperCase();
 }
 
+function getContrastColor(hexColor) {
+  // Convert hex to RGB
+  const r = parseInt(hexColor.substr(0, 2), 16);
+  const g = parseInt(hexColor.substr(2, 2), 16);
+  const b = parseInt(hexColor.substr(4, 2), 16);
+  
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  
+  // Return black for light backgrounds, white for dark backgrounds
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
 // --- GraphQL Queries -------------------------------------------------------
 const ORG_REPOS_ISSUES = `
   query OrgReposIssues($org: String!, $after: String) {
@@ -122,7 +135,7 @@ export default function App() {
   const [repos, setRepos] = useState([]); // [{id, name, url, issues: [...] }]
   const [orgMeta, setOrgMeta] = useState(null);
 
-  const loadData = async () => {
+    const loadData = async () => {
     setLoading(true);
     setError("");
     setRepos([]);
@@ -223,7 +236,7 @@ export default function App() {
     return Array.from(out.values()).sort((a,b) => b.issues.length - a.issues.length);
   }, [allIssues]);
 
-  const top5Assignees = useMemo(() => byAssignee.slice(0, 5), [byAssignee]);
+  const top7Assignees = useMemo(() => byAssignee.slice(0, 7), [byAssignee]);
 
   const byLabel = useMemo(() => {
     const out = new Map();
@@ -361,11 +374,11 @@ export default function App() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Top 5 Assignees</CardTitle>
+                  <CardTitle>Top 7 Assignees</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {top5Assignees.map((row) => (
+                    {top7Assignees.map((row) => (
                       <div key={row.assignee.login} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Avatar className="w-7 h-7">
@@ -379,7 +392,7 @@ export default function App() {
                         <Badge variant="secondary">{row.issues.length}</Badge>
                       </div>
                     ))}
-                    {!top5Assignees.length && <p className="text-sm text-gray-500">No assignees found.</p>}
+                    {!top7Assignees.length && <p className="text-sm text-gray-500">No assignees found.</p>}
                   </div>
                 </CardContent>
               </Card>
@@ -398,7 +411,18 @@ export default function App() {
                           <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline truncate block">#{iss.number} {iss.title}</a>
                           <div className="text-xs text-gray-500">{iss.repository?.nameWithOwner} • {fmtDate(iss.createdAt)}</div>
                           <div className="mt-1 flex flex-wrap gap-1">
-                            {iss.labels.map(l => <Badge key={l.id} variant="outline">{l.name}</Badge>)}
+                            {iss.labels.map(l => (
+                              <span
+                                key={l.id}
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                                style={{
+                                  backgroundColor: `#${l.color}`,
+                                  color: getContrastColor(l.color)
+                                }}
+                              >
+                                {l.name}
+                              </span>
+                            ))}
                           </div>
                         </div>
                         <Badge>{iss.state}</Badge>
