@@ -8,7 +8,7 @@ import { Badge } from "./components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { Loader2, Github, RefreshCcw, Search, ShieldQuestion, ExternalLink, FolderKanban } from "lucide-react";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
 
 /**
  * GitHub Issues Manager (React)
@@ -309,8 +309,9 @@ export default function App() {
                         <XAxis dataKey="date" hide />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
-                        <Line type="monotone" dataKey="opened" />
-                        <Line type="monotone" dataKey="closed" />
+                        <Legend />
+                        <Line type="monotone" dataKey="opened" name="Opened" stroke="#22c55e" />
+                        <Line type="monotone" dataKey="closed" name="Closed" stroke="#ef4444" />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
