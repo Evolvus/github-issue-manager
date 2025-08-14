@@ -49,7 +49,7 @@ async function githubGraphQL(token, query, variables = {}) {
 
 function fmtDate(iso) {
   const d = new Date(iso);
-  return d.toLocaleDateString();
+  return d.toLocaleDateString("en-GB");
 }
 
 function daysRange(n = 30) {
@@ -201,7 +201,9 @@ export default function App() {
     if (range === "year") {
       return new Date(d + "-01").toLocaleString("default", { month: "short" });
     }
-    return d.slice(5);
+    const day = d.slice(8, 10);
+    const month = d.slice(5, 7);
+    return `${day}/${month}`;
   };
 
   const latest5 = useMemo(() => {
@@ -284,7 +286,7 @@ export default function App() {
           <div className="ml-auto flex items-center gap-2 w-full sm:w-auto">
             <Input placeholder="Organization (e.g. vercel)" value={org} onChange={e=>setOrg(e.target.value)} className="w-44" />
             <Input placeholder="Personal Access Token" type="password" value={token} onChange={e=>setToken(e.target.value)} className="w-64" />
-            <Button onClick={loadData} disabled={loading || !org || !token}>
+            <Button className="bg-black text-white" onClick={loadData} disabled={loading || !org || !token}>
               {loading ? (<><Loader2 className="w-4 h-4 animate-spin"/><span>Loading</span></>) : (<><RefreshCcw className="w-4 h-4"/><span>Load</span></>)}
             </Button>
           </div>
@@ -334,9 +336,9 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <CardTitle>Opened vs Closed</CardTitle>
                     <div className="flex gap-2">
-                      <Button className={range === "week" ? "" : "bg-white text-black border"} onClick={()=>setRange("week")}>Week</Button>
-                      <Button className={range === "month" ? "" : "bg-white text-black border"} onClick={()=>setRange("month")}>Month</Button>
-                      <Button className={range === "year" ? "" : "bg-white text-black border"} onClick={()=>setRange("year")}>Year</Button>
+                        <Button className={range === "week" ? "bg-black text-white" : "bg-white text-black border"} onClick={()=>setRange("week")}>Week</Button>
+                        <Button className={range === "month" ? "bg-black text-white" : "bg-white text-black border"} onClick={()=>setRange("month")}>Month</Button>
+                        <Button className={range === "year" ? "bg-black text-white" : "bg-white text-black border"} onClick={()=>setRange("year")}>Year</Button>
                     </div>
                   </div>
                 </CardHeader>
