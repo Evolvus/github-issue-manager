@@ -49,7 +49,7 @@ async function githubGraphQL(token, query, variables = {}) {
 
 function fmtDate(iso) {
   const d = new Date(iso);
-  return d.toLocaleDateString();
+  return d.toLocaleDateString("en-GB");
 }
 
 function daysRange(n = 30) {
@@ -61,6 +61,16 @@ function daysRange(n = 30) {
     out.push(d.toISOString().slice(0, 10));
   }
   return out; // YYYY-MM-DD
+}
+
+function monthsRange(n = 12) {
+  const out = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push(d.toISOString().slice(0, 7));
+  }
+  return out; // YYYY-MM
 }
 
 function initials(str = "?") {
@@ -157,20 +167,42 @@ export default function App() {
   // --- Derived Data -------------------------------------------------------
   const allIssues = useMemo(() => repos.flatMap(r => r.issues.map(i => ({...i, repo: r.name, repoUrl: r.url}))), [repos]);
 
-  const last30 = useMemo(() => daysRange(30), []);
+  const [range, setRange] = useState("month"); // week | month | year
 
   const openedClosedSeries = useMemo(() => {
-    const map = Object.fromEntries(last30.map(d => [d, { date: d, opened: 0, closed: 0 }]));
-    for (const iss of allIssues) {
-      const dOpen = iss.createdAt?.slice(0,10);
-      if (map[dOpen]) map[dOpen].opened++;
-      if (iss.closedAt) {
-        const dClose = iss.closedAt.slice(0,10);
-        if (map[dClose]) map[dClose].closed++;
+    if (range === "year") {
+      const months = monthsRange(12);
+      const map = Object.fromEntries(months.map(m => [m, { date: m, opened: 0, closed: 0 }]));
+      for (const iss of allIssues) {
+        const mOpen = iss.createdAt?.slice(0,7);
+        if (map[mOpen]) map[mOpen].opened++;
+        if (iss.closedAt) {
+          const mClose = iss.closedAt.slice(0,7);
+          if (map[mClose]) map[mClose].closed++;
+        }
       }
+      return Object.values(map);
+    } else {
+      const days = range === "week" ? daysRange(7) : daysRange(30);
+      const map = Object.fromEntries(days.map(d => [d, { date: d, opened: 0, closed: 0 }]));
+      for (const iss of allIssues) {
+        const dOpen = iss.createdAt?.slice(0,10);
+        if (map[dOpen]) map[dOpen].opened++;
+        if (iss.closedAt) {
+          const dClose = iss.closedAt.slice(0,10);
+          if (map[dClose]) map[dClose].closed++;
+        }
+      }
+      return Object.values(map);
     }
-    return Object.values(map);
-  }, [allIssues, last30]);
+  }, [allIssues, range]);
+
+  const formatXAxis = (d) => {
+    if (range === "year") {
+      return new Date(d + "-01").toLocaleString("default", { month: "short" });
+    }
+    return `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+  };
 
   const latest5 = useMemo(() => {
     return [...allIssues].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
@@ -299,16 +331,23 @@ export default function App() {
             <div className="grid md:grid-cols-3 gap-4">
               <Card className="md:col-span-2">
                 <CardHeader>
-                  <CardTitle>Opened vs Closed (last 30 days)</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Opened vs Closed</CardTitle>
+                    <div className="flex gap-2">
+                      <Button variant={range === "week" ? "default" : "outline"} onClick={() => setRange("week")}>Week</Button>
+                      <Button variant={range === "month" ? "default" : "outline"} onClick={() => setRange("month")}>Month</Button>
+                      <Button variant={range === "year" ? "default" : "outline"} onClick={() => setRange("year")}>Year</Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={openedClosedSeries}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" hide />
+                        <XAxis dataKey="date" tickFormatter={formatXAxis} />
                         <YAxis allowDecimals={false} />
-                        <Tooltip />
+                        <Tooltip labelFormatter={formatXAxis} />
                         <Legend />
                         <Line type="monotone" dataKey="opened" name="Opened" stroke="#22c55e" />
                         <Line type="monotone" dataKey="closed" name="Closed" stroke="#ef4444" />
