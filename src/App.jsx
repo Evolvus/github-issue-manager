@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
 import { Badge } from "./components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
-import { Loader2, Github, RefreshCcw, Search, ShieldQuestion, ExternalLink, FolderKanban } from "lucide-react";
+import { Loader2, Github, RefreshCcw, Search, ShieldQuestion, ExternalLink, FolderKanban, Download, ChevronDown } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
 
 /**
@@ -91,6 +91,32 @@ function getContrastColor(hexColor) {
   
   // Return black for light backgrounds, white for dark backgrounds
   return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+function issuesToCSV(issues) {
+  const headers = ["Number", "Title", "URL", "State", "Repository", "ProjectStatus", "CreatedAt", "ClosedAt"];
+  const rows = issues.map(i => [
+    i.number,
+    '"' + (i.title || '').replace(/"/g, '""') + '"',
+    i.url || '',
+    i.state || '',
+    (i.repository?.nameWithOwner || i.repository || ''),
+    i.project_status || '',
+    i.createdAt || '',
+    i.closedAt || ''
+  ]);
+  return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+}
+
+function downloadCSV(issues, filename) {
+  const csv = issuesToCSV(issues);
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // --- GraphQL Queries -------------------------------------------------------
@@ -287,7 +313,27 @@ export default function App() {
   };
 
   // --- Derived Data -------------------------------------------------------
-  const allIssues = useMemo(() => repos.flatMap(r => r.issues.map(i => ({...i, repo: r.name, repoUrl: r.url}))), [repos]);
+  const allIssues = useMemo(() => {
+    const repoIssues = repos.flatMap(r => r.issues.map(i => ({ ...i, repo: r.name, repoUrl: r.url })));
+    const repoIds = new Set(repoIssues.map(i => i.id));
+    const extra = [];
+    projects.forEach(p => {
+      p.issues.forEach(i => {
+        if (!repoIds.has(i.id)) {
+          extra.push({
+            ...i,
+            repo: i.repository,
+            repoUrl: "",
+            assignees: [],
+            labels: [],
+            milestone: null,
+            repository: { nameWithOwner: i.repository },
+          });
+        }
+      });
+    });
+    return [...repoIssues, ...extra];
+  }, [repos, projects]);
 
   const sprints = useMemo(() => {
     const map = {};
@@ -426,22 +472,29 @@ export default function App() {
   }, [allIssues]);
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [collapsedCols, setCollapsedCols] = useState({});
+  const handleDrop = (issueId, newStatus) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id !== selectedProjectId) return p;
+      return {
+        ...p,
+        issues: p.issues.map(i => i.id === issueId ? { ...i, project_status: newStatus } : i)
+      };
+    }));
+  };
+  const toggleCollapse = status => setCollapsedCols(prev => ({ ...prev, [status]: !prev[status] }));
   const projectBoardByStatus = useMemo(() => {
     if (!selectedProjectId) return [];
     const proj = projects.find(p => p.id === selectedProjectId);
     if (!proj) return [];
-    const colMap = new Map();
+    const order = ["Backlog", "Ready", "In progress", "In review", "Done"];
+    const colMap = new Map(order.map(st => [st, []]));
     for (const iss of proj.issues) {
       const statusVal = iss.project_status || "Backlog";
       if (!colMap.has(statusVal)) colMap.set(statusVal, []);
       colMap.get(statusVal).push({ ...iss, project: proj.title });
     }
-    const order = ["Backlog", "Ready", "In progress", "In review", "Done"];
-    return Array.from(colMap.entries()).sort((a,b) => {
-      const ai = order.indexOf(a[0]);
-      const bi = order.indexOf(b[0]);
-      return (ai === -1 ? order.length : ai) - (bi === -1 ? order.length : bi);
-    });
+    return order.map(st => [st, colMap.get(st) || []]);
   }, [selectedProjectId, projects]);
 
   // Search and filters
@@ -892,19 +945,25 @@ export default function App() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>{status}</CardTitle>
-                      <Badge variant="secondary">{list.length}</Badge>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="secondary">{list.length}</Badge>
+                        <Download className="w-4 h-4 cursor-pointer" onClick={() => downloadCSV(list, `${status}.csv`)} />
+                        <ChevronDown onClick={() => toggleCollapse(status)} className={`w-4 h-4 cursor-pointer transition-transform ${collapsedCols[status] ? '-rotate-90' : ''}`} />
+                      </div>
                     </div>
                   </CardHeader>
+                  {!collapsedCols[status] && (
                   <CardContent>
-                    <ul className="space-y-3 max-h-[70vh] overflow-auto pr-1">
+                    <ul className="space-y-3 max-h-[70vh] overflow-auto pr-1" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault(); const data = JSON.parse(e.dataTransfer.getData('text/plain')); handleDrop(data.issueId, status);}}>
                       {list.map(iss => (
-                        <li key={iss.id} className="p-3 border rounded-xl bg-white shadow-sm">
+                        <li key={iss.id} className="p-3 border rounded-xl bg-white shadow-sm" draggable onDragStart={e=>e.dataTransfer.setData('text/plain', JSON.stringify({ issueId: iss.id }))}>
                           <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline block">#{iss.number} {iss.title}</a>
                           <div className="text-xs text-gray-500">{iss.repository} • {fmtDate(iss.createdAt)}</div>
                         </li>
                       ))}
                     </ul>
                   </CardContent>
+                  )}
                 </Card>
               ))}
               {!projectBoardByStatus.length && (
@@ -969,6 +1028,9 @@ export default function App() {
                 <option value="">All Tags</option>
                 {tagOptions.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
+              <Button onClick={() => downloadCSV(filteredAllIssues, "all-issues.csv")} className="ml-auto text-sm">
+                <Download className="w-4 h-4"/> Download
+              </Button>
             </div>
             <div className="mb-3 text-sm text-gray-500">Showing {filteredAllIssues.length} issues</div>
             <div className="grid md:grid-cols-2 gap-4">
