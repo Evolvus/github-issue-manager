@@ -401,6 +401,14 @@ export default function App() {
     [allIssues, projectStatusMap]
   );
 
+  const stats = useMemo(() => {
+    const open = allIssuesWithStatus.filter(i => i.state === "OPEN").length;
+    const closed = allIssuesWithStatus.filter(i => i.state === "CLOSED").length;
+    const backlog = allIssuesWithStatus.filter(i => i.project_status === "Backlog").length;
+    const thisSprint = allIssuesWithStatus.filter(i => ["Ready", "In progress", "In review"].includes(i.project_status)).length;
+    return { open, closed, backlog, thisSprint };
+  }, [allIssuesWithStatus]);
+
   const topFixers = useMemo(() => {
     const map = new Map();
     for (const iss of allIssues) {
@@ -414,7 +422,7 @@ export default function App() {
         row.issues.push(iss);
       }
     }
-    return Array.from(map.values()).sort((a,b) => b.count - a.count).slice(0,5);
+    return Array.from(map.values()).sort((a,b) => b.count - a.count).slice(0,10);
   }, [allIssues]);
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -443,6 +451,8 @@ export default function App() {
   const [filterAssignee, setFilterAssignee] = useState("");
   const [filterTag, setFilterTag] = useState("");
 
+  const [activeTab, setActiveTab] = useState("dashboard");
+
   const projectStatusOptions = useMemo(() => {
     const set = new Set();
     allIssuesWithStatus.forEach(i => { if (i.project_status) set.add(i.project_status); });
@@ -451,8 +461,14 @@ export default function App() {
 
   const assigneeOptions = useMemo(() => {
     const set = new Set();
-    allIssuesWithStatus.forEach(i => i.assignees.forEach(a => set.add(a.login)));
-    return Array.from(set).sort();
+    let hasUnassigned = false;
+    allIssuesWithStatus.forEach(i => {
+      if (!i.assignees.length) hasUnassigned = true;
+      i.assignees.forEach(a => set.add(a.login));
+    });
+    const arr = Array.from(set).sort();
+    if (hasUnassigned) arr.unshift("(unassigned)");
+    return arr;
   }, [allIssuesWithStatus]);
 
   const tagOptions = useMemo(() => {
@@ -466,7 +482,10 @@ export default function App() {
     return allIssuesWithStatus.filter(i =>
       (!filterState || i.state === filterState) &&
       (!filterProjectStatus || i.project_status === filterProjectStatus) &&
-      (!filterAssignee || i.assignees.some(a => a.login === filterAssignee)) &&
+      (!filterAssignee ||
+        (filterAssignee === "(unassigned)"
+          ? i.assignees.length === 0
+          : i.assignees.some(a => a.login === filterAssignee))) &&
       (!filterTag || i.labels.some(l => l.name === filterTag)) &&
       (!q ||
         i.title.toLowerCase().includes(q) ||
@@ -477,10 +496,6 @@ export default function App() {
     );
   }, [allIssuesWithStatus, filterState, filterProjectStatus, filterAssignee, filterTag, query]);
 
-  const [assigneeIssueTitle, setAssigneeIssueTitle] = useState("");
-  const [assigneeIssueList, setAssigneeIssueList] = useState([]);
-  const [tagIssueTitle, setTagIssueTitle] = useState("");
-  const [tagIssueList, setTagIssueList] = useState([]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -512,6 +527,7 @@ export default function App() {
 
         <Tabs defaultValue="dashboard">
           <TabsList className="grid grid-cols-6 w-full sm:w-auto">
+
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="by-assignee">By Assignee</TabsTrigger>
             <TabsTrigger value="by-tags">By Tags</TabsTrigger>
@@ -534,6 +550,25 @@ export default function App() {
                   <Input placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-60"/>
                 </div>
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader><CardTitle>Open</CardTitle></CardHeader>
+                <CardContent><div className="text-3xl font-bold">{stats.open}</div></CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Closed</CardTitle></CardHeader>
+                <CardContent><div className="text-3xl font-bold">{stats.closed}</div></CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Backlog</CardTitle></CardHeader>
+                <CardContent><div className="text-3xl font-bold">{stats.backlog}</div></CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>This Sprint</CardTitle></CardHeader>
+                <CardContent><div className="text-3xl font-bold">{stats.thisSprint}</div></CardContent>
+              </Card>
             </div>
 
             <div className="grid md:grid-cols-3 gap-4">
@@ -628,7 +663,7 @@ export default function App() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Top 5 Issue Fixers</CardTitle>
+                  <CardTitle>Top 10 Issue Fixers</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -685,13 +720,55 @@ export default function App() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setAssigneeIssueTitle(`${row.assignee.login} - Open`); setAssigneeIssueList(row.issues.filter(i => i.state === "OPEN"));}}>{open}</a>
+                            <a
+                              href="#"
+                              className="text-blue-600 underline"
+                              onClick={e => {
+                                e.preventDefault();
+                                setFilterAssignee(row.assignee.login);
+                                setFilterState("OPEN");
+                                setFilterProjectStatus("");
+                                setFilterTag("");
+                                setQuery("");
+                                setActiveTab("all-issues");
+                              }}
+                            >
+                              {open}
+                            </a>
                           </TableCell>
                           <TableCell>
-                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setAssigneeIssueTitle(`${row.assignee.login} - Closed`); setAssigneeIssueList(row.issues.filter(i => i.state === "CLOSED"));}}>{closed}</a>
+                            <a
+                              href="#"
+                              className="text-blue-600 underline"
+                              onClick={e => {
+                                e.preventDefault();
+                                setFilterAssignee(row.assignee.login);
+                                setFilterState("CLOSED");
+                                setFilterProjectStatus("");
+                                setFilterTag("");
+                                setQuery("");
+                                setActiveTab("all-issues");
+                              }}
+                            >
+                              {closed}
+                            </a>
                           </TableCell>
                           <TableCell>
-                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setAssigneeIssueTitle(`${row.assignee.login} - All`); setAssigneeIssueList(row.issues);}}>{row.issues.length}</a>
+                            <a
+                              href="#"
+                              className="text-blue-600 underline"
+                              onClick={e => {
+                                e.preventDefault();
+                                setFilterAssignee(row.assignee.login);
+                                setFilterState("");
+                                setFilterProjectStatus("");
+                                setFilterTag("");
+                                setQuery("");
+                                setActiveTab("all-issues");
+                              }}
+                            >
+                              {row.issues.length}
+                            </a>
                           </TableCell>
                         </TableRow>
                       );
@@ -703,22 +780,6 @@ export default function App() {
                 </Table>
               </CardContent>
             </Card>
-            {assigneeIssueList.length > 0 && (
-              <div className="mt-4">
-                <Card>
-                  <CardHeader><CardTitle>{assigneeIssueTitle}</CardTitle></CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2 max-h-96 overflow-auto">
-                      {assigneeIssueList.map(iss => (
-                        <li key={iss.id} className="text-sm">
-                          <a href={iss.url} target="_blank" rel="noreferrer" className="hover:underline">#{iss.number} {iss.title}</a>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
           </TabsContent>
 
           {/* BY TAGS */}
@@ -747,13 +808,55 @@ export default function App() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setTagIssueTitle(`${label} - Open`); setTagIssueList(list.filter(i => i.state === "OPEN"));}}>{open}</a>
+                            <a
+                              href="#"
+                              className="text-blue-600 underline"
+                              onClick={e => {
+                                e.preventDefault();
+                                setFilterTag(label);
+                                setFilterState("OPEN");
+                                setFilterProjectStatus("");
+                                setFilterAssignee("");
+                                setQuery("");
+                                setActiveTab("all-issues");
+                              }}
+                            >
+                              {open}
+                            </a>
                           </TableCell>
                           <TableCell>
-                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setTagIssueTitle(`${label} - Closed`); setTagIssueList(list.filter(i => i.state === "CLOSED"));}}>{closed}</a>
+                            <a
+                              href="#"
+                              className="text-blue-600 underline"
+                              onClick={e => {
+                                e.preventDefault();
+                                setFilterTag(label);
+                                setFilterState("CLOSED");
+                                setFilterProjectStatus("");
+                                setFilterAssignee("");
+                                setQuery("");
+                                setActiveTab("all-issues");
+                              }}
+                            >
+                              {closed}
+                            </a>
                           </TableCell>
                           <TableCell>
-                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setTagIssueTitle(`${label} - All`); setTagIssueList(list);}}>{list.length}</a>
+                            <a
+                              href="#"
+                              className="text-blue-600 underline"
+                              onClick={e => {
+                                e.preventDefault();
+                                setFilterTag(label);
+                                setFilterState("");
+                                setFilterProjectStatus("");
+                                setFilterAssignee("");
+                                setQuery("");
+                                setActiveTab("all-issues");
+                              }}
+                            >
+                              {list.length}
+                            </a>
                           </TableCell>
                         </TableRow>
                       );
@@ -765,22 +868,6 @@ export default function App() {
                 </Table>
               </CardContent>
             </Card>
-            {tagIssueList.length > 0 && (
-              <div className="mt-4">
-                <Card>
-                  <CardHeader><CardTitle>{tagIssueTitle}</CardTitle></CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2 max-h-96 overflow-auto">
-                      {tagIssueList.map(iss => (
-                        <li key={iss.id} className="text-sm">
-                          <a href={iss.url} target="_blank" rel="noreferrer" className="hover:underline">#{iss.number} {iss.title}</a>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
           </TabsContent>
 
           {/* PROJECT BOARD */}
@@ -883,6 +970,7 @@ export default function App() {
                 {tagOptions.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
+            <div className="mb-3 text-sm text-gray-500">Showing {filteredAllIssues.length} issues</div>
             <div className="grid md:grid-cols-2 gap-4">
               {filteredAllIssues.map(iss => (
                 <Card key={iss.id}>

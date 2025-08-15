@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState } from "react";
 const TabsCtx = createContext(null);
-export function Tabs({ defaultValue, children }) {
-  const [value, setValue] = useState(defaultValue);
+export function Tabs({ defaultValue, value: valueProp, onValueChange, children }) {
+  const [internal, setInternal] = useState(defaultValue);
+  const value = valueProp !== undefined ? valueProp : internal;
+  const setValue = onValueChange !== undefined ? onValueChange : setInternal;
   return <TabsCtx.Provider value={{ value, setValue }}>{children}</TabsCtx.Provider>;
 }
 export function TabsList({ children, className="" }) {
