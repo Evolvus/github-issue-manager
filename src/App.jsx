@@ -503,6 +503,7 @@ export default function App() {
   const [filterProjectStatus, setFilterProjectStatus] = useState("");
   const [filterAssignee, setFilterAssignee] = useState("");
   const [filterTag, setFilterTag] = useState("");
+  const [filterMilestone, setFilterMilestone] = useState("");
 
   const [activeTab, setActiveTab] = useState("dashboard");
 
@@ -530,6 +531,21 @@ export default function App() {
     return Array.from(set).sort();
   }, [allIssuesWithStatus]);
 
+  const milestoneOptions = useMemo(() => {
+    const set = new Set();
+    let hasNone = false;
+    allIssuesWithStatus.forEach(i => {
+      if (i.milestone) {
+        set.add(i.milestone.title);
+      } else {
+        hasNone = true;
+      }
+    });
+    const arr = Array.from(set).sort();
+    if (hasNone) arr.unshift("(none)");
+    return arr;
+  }, [allIssuesWithStatus]);
+
   const filteredAllIssues = useMemo(() => {
     const q = query.toLowerCase();
     return allIssuesWithStatus.filter(i =>
@@ -540,6 +556,10 @@ export default function App() {
           ? i.assignees.length === 0
           : i.assignees.some(a => a.login === filterAssignee))) &&
       (!filterTag || i.labels.some(l => l.name === filterTag)) &&
+      (!filterMilestone ||
+        (filterMilestone === "(none)"
+          ? !i.milestone
+          : i.milestone?.title === filterMilestone)) &&
       (!q ||
         i.title.toLowerCase().includes(q) ||
         i.repository?.nameWithOwner?.toLowerCase().includes(q) ||
@@ -547,7 +567,7 @@ export default function App() {
         i.labels.some(l => l.name.toLowerCase().includes(q))
       )
     );
-  }, [allIssuesWithStatus, filterState, filterProjectStatus, filterAssignee, filterTag, query]);
+  }, [allIssuesWithStatus, filterState, filterProjectStatus, filterAssignee, filterTag, filterMilestone, query]);
 
 
   return (
@@ -984,19 +1004,17 @@ export default function App() {
                       </CardTitle>
                       <Badge variant="secondary">{sp.closed}/{sp.open + sp.closed}</Badge>
                     </div>
-                    {sp.dueOn && <div className="text-xs text-gray-500 mt-1">Due {fmtDate(sp.dueOn)}</div>}
+                  {sp.dueOn && <div className="text-xs text-gray-500 mt-1">Due {fmtDate(sp.dueOn)}</div>}
                   </CardHeader>
                   <CardContent>
                     <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
                       <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${((sp.closed/(sp.open+sp.closed))*100 || 0)}%` }} />
                     </div>
-                    <ul className="space-y-2 max-h-60 overflow-auto pr-1">
+                    <div className="space-y-2 max-h-60 overflow-auto pr-1">
                       {sp.issues.map(iss => (
-                        <li key={iss.id} className="text-sm">
-                          <a href={iss.url} target="_blank" rel="noreferrer" className="hover:underline">#{iss.number} {iss.title}</a>
-                        </li>
+                        <IssueCard key={iss.id} issue={iss} />
                       ))}
-                    </ul>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -1028,6 +1046,10 @@ export default function App() {
                 <option value="">All Tags</option>
                 {tagOptions.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
+              <select value={filterMilestone} onChange={e=>setFilterMilestone(e.target.value)} className="border rounded-md text-sm px-2 py-1">
+                <option value="">All Milestones</option>
+                {milestoneOptions.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
               <Button onClick={() => downloadCSV(filteredAllIssues, "all-issues.csv")} className="ml-auto text-sm">
                 <Download className="w-4 h-4"/> Download
               </Button>
@@ -1035,21 +1057,7 @@ export default function App() {
             <div className="mb-3 text-sm text-gray-500">Showing {filteredAllIssues.length} issues</div>
             <div className="grid md:grid-cols-2 gap-4">
               {filteredAllIssues.map(iss => (
-                <Card key={iss.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="truncate"><a href={iss.url} target="_blank" rel="noreferrer" className="hover:underline">#{iss.number} {iss.title}</a></CardTitle>
-                      <Badge variant="secondary">{iss.state}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xs text-gray-500 mb-1">{iss.repository?.nameWithOwner}</div>
-                    {iss.project_status && <div className="text-xs text-gray-500 mb-1">Status: {iss.project_status}</div>}
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {iss.labels.map(l => <Badge key={l.id} variant="outline">{l.name}</Badge>)}
-                    </div>
-                  </CardContent>
-                </Card>
+                <IssueCard key={iss.id} issue={iss} />
               ))}
               {!filteredAllIssues.length && <Card><CardContent className="py-10"><EmptyState /></CardContent></Card>}
             </div>
@@ -1068,6 +1076,69 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+function IssueCard({ issue }) {
+  const typeLabel = issue.labels.find(l => /^type:\s*/i.test(l.name));
+  const otherLabels = issue.labels.filter(l => l !== typeLabel);
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="truncate">
+            <a href={issue.url} target="_blank" rel="noreferrer" className="hover:underline">
+              #{issue.number} {issue.title}
+            </a>
+          </CardTitle>
+          <Badge variant="secondary">{issue.state}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-xs text-gray-500 mb-1">{issue.repository?.nameWithOwner}</div>
+        {issue.milestone && (
+          <div className="text-xs text-gray-500 mb-1">Milestone: {issue.milestone.title}</div>
+        )}
+        {issue.project_status && (
+          <div className="text-xs text-gray-500 mb-1">Status: {issue.project_status}</div>
+        )}
+        {typeLabel && (
+          <div className="mt-1">
+            <span
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+              style={{ backgroundColor: `#${typeLabel.color}`, color: getContrastColor(typeLabel.color) }}
+            >
+              {typeLabel.name.replace(/^Type:\s*/i, "")}
+            </span>
+          </div>
+        )}
+        {otherLabels.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {otherLabels.map(l => (
+              <span
+                key={l.id}
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                style={{ backgroundColor: `#${l.color}`, color: getContrastColor(l.color) }}
+              >
+                {l.name}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="mt-2 flex items-center gap-1">
+          {issue.assignees.length ? (
+            issue.assignees.map(a => (
+              <Avatar key={a.login} className="w-6 h-6">
+                <AvatarImage src={a.avatarUrl} />
+                <AvatarFallback>{initials(a.login)}</AvatarFallback>
+              </Avatar>
+            ))
+          ) : (
+            <span className="text-xs text-gray-500">(unassigned)</span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
