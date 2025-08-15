@@ -118,6 +118,7 @@ const ORG_REPOS_ISSUES = `
               repository { nameWithOwner url }
               assignees(first: 10) { nodes { login avatarUrl url } }
               labels(first: 20) { nodes { id name color } }
+              milestone { id title url dueOn description }
             }
           }
         }
@@ -269,6 +270,7 @@ export default function App() {
             repository: i.repository,
             assignees: i.assignees?.nodes || [],
             labels: i.labels?.nodes || [],
+            milestone: i.milestone || null,
           }))
         })));
         if (!orgNode.repositories.pageInfo.hasNextPage) break;
@@ -286,6 +288,30 @@ export default function App() {
 
   // --- Derived Data -------------------------------------------------------
   const allIssues = useMemo(() => repos.flatMap(r => r.issues.map(i => ({...i, repo: r.name, repoUrl: r.url}))), [repos]);
+
+  const sprints = useMemo(() => {
+    const map = {};
+    for (const iss of allIssues) {
+      if (!iss.milestone) continue;
+      const m = iss.milestone;
+      if (!map[m.id]) {
+        map[m.id] = {
+          id: m.id,
+          title: m.title,
+          url: m.url,
+          dueOn: m.dueOn,
+          description: m.description,
+          issues: [],
+        };
+      }
+      map[m.id].issues.push(iss);
+    }
+    return Object.values(map).map(m => ({
+      ...m,
+      open: m.issues.filter(i => i.state === "OPEN").length,
+      closed: m.issues.filter(i => i.state === "CLOSED").length,
+    }));
+  }, [allIssues]);
 
   const [range, setRange] = useState("month"); // week | month | year
 
@@ -499,12 +525,14 @@ export default function App() {
           </Card>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-5 w-full sm:w-auto">
+        <Tabs defaultValue="dashboard">
+          <TabsList className="grid grid-cols-6 w-full sm:w-auto">
+
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="by-assignee">By Assignee</TabsTrigger>
             <TabsTrigger value="by-tags">By Tags</TabsTrigger>
             <TabsTrigger value="project-board">Project Board</TabsTrigger>
+            <TabsTrigger value="sprints">Sprints</TabsTrigger>
             <TabsTrigger value="all-issues">All Issues</TabsTrigger>
           </TabsList>
 
@@ -882,6 +910,38 @@ export default function App() {
               {!projectBoardByStatus.length && (
                 <Card><CardContent className="py-10"><EmptyState /></CardContent></Card>
               )}
+            </div>
+          </TabsContent>
+
+          {/* SPRINTS */}
+          <TabsContent value="sprints" className="mt-6">
+            <div className="grid md:grid-cols-2 gap-4">
+              {sprints.map(sp => (
+                <Card key={sp.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="truncate">
+                        <a href={sp.url} target="_blank" rel="noreferrer" className="hover:underline">{sp.title}</a>
+                      </CardTitle>
+                      <Badge variant="secondary">{sp.closed}/{sp.open + sp.closed}</Badge>
+                    </div>
+                    {sp.dueOn && <div className="text-xs text-gray-500 mt-1">Due {fmtDate(sp.dueOn)}</div>}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
+                      <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${((sp.closed/(sp.open+sp.closed))*100 || 0)}%` }} />
+                    </div>
+                    <ul className="space-y-2 max-h-60 overflow-auto pr-1">
+                      {sp.issues.map(iss => (
+                        <li key={iss.id} className="text-sm">
+                          <a href={iss.url} target="_blank" rel="noreferrer" className="hover:underline">#{iss.number} {iss.title}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ))}
+              {!sprints.length && <Card><CardContent className="py-10"><EmptyState /></CardContent></Card>}
             </div>
           </TabsContent>
 
