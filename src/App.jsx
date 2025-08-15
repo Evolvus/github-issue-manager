@@ -255,7 +255,7 @@ export default function App() {
   }, [allIssues]);
 
   // Infer Project Status from labels like "Status: Backlog/In Progress/Done"; fallback to "Backlog"
-  const byStatus = useMemo(() => {
+  const allByStatus = useMemo(() => {
     const colMap = new Map();
     function col(name) { if (!colMap.has(name)) colMap.set(name, []); return colMap.get(name); }
     for (const iss of allIssues) {
@@ -276,6 +276,20 @@ export default function App() {
     }
     return Array.from(out.entries()).sort((a,b) => b[1].length - a[1].length);
   }, [allIssues]);
+
+  const [selectedProject, setSelectedProject] = useState("");
+  const projectByStatus = useMemo(() => {
+    if (!selectedProject) return [];
+    const issues = byRepo.find(([repo]) => repo === selectedProject)?.[1] || [];
+    const colMap = new Map();
+    function col(name) { if (!colMap.has(name)) colMap.set(name, []); return colMap.get(name); }
+    for (const iss of issues) {
+      const statusLabel = iss.labels.find(l => /^status\s*:/i.test(l.name));
+      const statusVal = statusLabel ? statusLabel.name.split(":")[1].trim() : "Backlog";
+      col(statusVal).push(iss);
+    }
+    return Array.from(colMap.entries()).sort((a,b) => a[0].localeCompare(b[0]));
+  }, [selectedProject, byRepo]);
 
   // Search filter for tables
   const [query, setQuery] = useState("");
@@ -435,11 +449,23 @@ export default function App() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Project Issues (by Status)</CardTitle>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle>Project Issues (by Status)</CardTitle>
+                    <select
+                      value={selectedProject}
+                      onChange={e => setSelectedProject(e.target.value)}
+                      className="border rounded-md text-sm px-2 py-1"
+                    >
+                      <option value="">Select project</option>
+                      {byRepo.map(([repo]) => (
+                        <option key={repo} value={repo}>{repo}</option>
+                      ))}
+                    </select>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-3">
-                    {byStatus.map(([status, list]) => (
+                    {projectByStatus.map(([status, list]) => (
                       <div key={status} className="border rounded-2xl p-3">
                         <div className="flex items-center justify-between mb-2">
                           <div className="font-medium">{status}</div>
@@ -455,7 +481,7 @@ export default function App() {
                         </ul>
                       </div>
                     ))}
-                    {!byStatus.length && <EmptyState />}
+                    {!projectByStatus.length && <EmptyState />}
                   </div>
                 </CardContent>
               </Card>
@@ -554,7 +580,7 @@ export default function App() {
               <FolderKanban className="w-4 h-4"/> Columns are inferred from labels like <code className="px-1 bg-gray-100 rounded">Status: Backlog/In Progress/Done</code>.
             </div>
             <div className="grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-4">
-              {byStatus.map(([status, list]) => (
+              {allByStatus.map(([status, list]) => (
                 <Card key={status} className="rounded-2xl">
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -577,7 +603,7 @@ export default function App() {
                   </CardContent>
                 </Card>
               ))}
-              {!byStatus.length && (
+              {!allByStatus.length && (
                 <Card><CardContent className="py-10"><EmptyState /></CardContent></Card>
               )}
             </div>
