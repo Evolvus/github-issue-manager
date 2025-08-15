@@ -360,62 +360,101 @@ export default function App() {
     }
     return Array.from(out.entries()).sort((a,b) => b[1].length - a[1].length);
   }, [allIssues]);
+  const projectStatusMap = useMemo(() => {
+    const map = new Map();
+    for (const p of projects) {
+      for (const iss of p.issues) {
+        map.set(iss.id, iss.project_status);
+      }
+    }
+    return map;
+  }, [projects]);
 
-  const allProjectIssues = useMemo(
-    () => projects.flatMap((p) => p.issues.map((i) => ({ ...i, project: p.title }))),
-    [projects]
+  const allIssuesWithStatus = useMemo(
+    () => allIssues.map(i => ({ ...i, project_status: projectStatusMap.get(i.id) || null })),
+    [allIssues, projectStatusMap]
   );
 
-  const projectBoardByStatus = useMemo(() => {
-    const colMap = new Map();
-    function col(name) {
-      if (!colMap.has(name)) colMap.set(name, []);
-      return colMap.get(name);
-    }
-    for (const iss of allProjectIssues) {
-      const statusVal = iss.project_status || "Backlog";
-      col(statusVal).push(iss);
-    }
-    const entries = Array.from(colMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-    return entries;
-  }, [allProjectIssues]);
-
-  const byRepo = useMemo(() => {
-    const out = new Map();
+  const topFixers = useMemo(() => {
+    const map = new Map();
     for (const iss of allIssues) {
-      const key = iss.repository?.nameWithOwner || iss.repo;
-      if (!out.has(key)) out.set(key, []);
-      out.get(key).push(iss);
+      if (iss.state !== "CLOSED") continue;
+      const assignees = iss.assignees.length ? iss.assignees : [{ login: "(unassigned)", avatarUrl: "", url: "#" }];
+      for (const a of assignees) {
+        const key = a.login;
+        if (!map.has(key)) map.set(key, { assignee: a, count: 0, issues: [] });
+        const row = map.get(key);
+        row.count++;
+        row.issues.push(iss);
+      }
     }
-    return Array.from(out.entries()).sort((a,b) => b[1].length - a[1].length);
+    return Array.from(map.values()).sort((a,b) => b.count - a.count).slice(0,5);
   }, [allIssues]);
 
-  const [selectedProject, setSelectedProject] = useState("");
-  const projectByStatus = useMemo(() => {
-    if (!selectedProject) return [];
-    const issues = byRepo.find(([repo]) => repo === selectedProject)?.[1] || [];
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const projectBoardByStatus = useMemo(() => {
+    if (!selectedProjectId) return [];
+    const proj = projects.find(p => p.id === selectedProjectId);
+    if (!proj) return [];
     const colMap = new Map();
-    function col(name) { if (!colMap.has(name)) colMap.set(name, []); return colMap.get(name); }
-    for (const iss of issues) {
-      const statusLabel = iss.labels.find(l => /^status\s*:/i.test(l.name));
-      const statusVal = statusLabel ? statusLabel.name.split(":")[1].trim() : "Backlog";
-      col(statusVal).push(iss);
+    for (const iss of proj.issues) {
+      const statusVal = iss.project_status || "Backlog";
+      if (!colMap.has(statusVal)) colMap.set(statusVal, []);
+      colMap.get(statusVal).push({ ...iss, project: proj.title });
     }
-    return Array.from(colMap.entries()).sort((a,b) => a[0].localeCompare(b[0]));
-  }, [selectedProject, byRepo]);
+    const order = ["Backlog", "Ready", "In progress", "In review", "Done"];
+    return Array.from(colMap.entries()).sort((a,b) => {
+      const ai = order.indexOf(a[0]);
+      const bi = order.indexOf(b[0]);
+      return (ai === -1 ? order.length : ai) - (bi === -1 ? order.length : bi);
+    });
+  }, [selectedProjectId, projects]);
 
-  // Search filter for tables
+  // Search and filters
   const [query, setQuery] = useState("");
-  const filteredIssues = useMemo(() => {
-    if (!query) return allIssues;
+  const [filterState, setFilterState] = useState("");
+  const [filterProjectStatus, setFilterProjectStatus] = useState("");
+  const [filterAssignee, setFilterAssignee] = useState("");
+  const [filterTag, setFilterTag] = useState("");
+
+  const projectStatusOptions = useMemo(() => {
+    const set = new Set();
+    allIssuesWithStatus.forEach(i => { if (i.project_status) set.add(i.project_status); });
+    return Array.from(set).sort();
+  }, [allIssuesWithStatus]);
+
+  const assigneeOptions = useMemo(() => {
+    const set = new Set();
+    allIssuesWithStatus.forEach(i => i.assignees.forEach(a => set.add(a.login)));
+    return Array.from(set).sort();
+  }, [allIssuesWithStatus]);
+
+  const tagOptions = useMemo(() => {
+    const set = new Set();
+    allIssuesWithStatus.forEach(i => i.labels.forEach(l => set.add(l.name)));
+    return Array.from(set).sort();
+  }, [allIssuesWithStatus]);
+
+  const filteredAllIssues = useMemo(() => {
     const q = query.toLowerCase();
-    return allIssues.filter(i =>
-      i.title.toLowerCase().includes(q) ||
-      i.repository?.nameWithOwner?.toLowerCase().includes(q) ||
-      i.assignees.some(a => a.login.toLowerCase().includes(q)) ||
-      i.labels.some(l => l.name.toLowerCase().includes(q))
+    return allIssuesWithStatus.filter(i =>
+      (!filterState || i.state === filterState) &&
+      (!filterProjectStatus || i.project_status === filterProjectStatus) &&
+      (!filterAssignee || i.assignees.some(a => a.login === filterAssignee)) &&
+      (!filterTag || i.labels.some(l => l.name === filterTag)) &&
+      (!q ||
+        i.title.toLowerCase().includes(q) ||
+        i.repository?.nameWithOwner?.toLowerCase().includes(q) ||
+        i.assignees.some(a => a.login.toLowerCase().includes(q)) ||
+        i.labels.some(l => l.name.toLowerCase().includes(q))
+      )
     );
-  }, [query, allIssues]);
+  }, [allIssuesWithStatus, filterState, filterProjectStatus, filterAssignee, filterTag, query]);
+
+  const [assigneeIssueTitle, setAssigneeIssueTitle] = useState("");
+  const [assigneeIssueList, setAssigneeIssueList] = useState([]);
+  const [tagIssueTitle, setTagIssueTitle] = useState("");
+  const [tagIssueList, setTagIssueList] = useState([]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -451,7 +490,7 @@ export default function App() {
             <TabsTrigger value="by-assignee">By Assignee</TabsTrigger>
             <TabsTrigger value="by-tags">By Tags</TabsTrigger>
             <TabsTrigger value="project-board">Project Board</TabsTrigger>
-            <TabsTrigger value="by-projects">By Projects</TabsTrigger>
+            <TabsTrigger value="all-issues">All Issues</TabsTrigger>
           </TabsList>
 
           {/* DASHBOARD */}
@@ -562,39 +601,25 @@ export default function App() {
 
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <CardTitle>Project Issues (by Status)</CardTitle>
-                    <select
-                      value={selectedProject}
-                      onChange={e => setSelectedProject(e.target.value)}
-                      className="border rounded-md text-sm px-2 py-1"
-                    >
-                      <option value="">Select project</option>
-                      {byRepo.map(([repo]) => (
-                        <option key={repo} value={repo}>{repo}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <CardTitle>Top 5 Issue Fixers</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-3">
-                    {projectByStatus.map(([status, list]) => (
-                      <div key={status} className="border rounded-2xl p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="font-medium">{status}</div>
-                          <Badge variant="secondary">{list.length}</Badge>
+                  <div className="space-y-3">
+                    {topFixers.map(row => (
+                      <div key={row.assignee.login} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="w-7 h-7">
+                            <AvatarImage src={row.assignee.avatarUrl} />
+                            <AvatarFallback>{initials(row.assignee.login)}</AvatarFallback>
+                          </Avatar>
+                          <a href={row.assignee.url} target="_blank" rel="noreferrer" className="text-sm hover:underline">
+                            {row.assignee.login}
+                          </a>
                         </div>
-                        <ul className="space-y-2 max-h-56 overflow-auto">
-                          {list.slice(0,6).map(iss => (
-                            <li key={iss.id} className="text-sm">
-                              <a href={iss.url} target="_blank" rel="noreferrer" className="hover:underline">#{iss.number} {iss.title}</a>
-                              <div className="text-xs text-gray-500">{iss.repository?.nameWithOwner}</div>
-                            </li>
-                          ))}
-                        </ul>
+                        <Badge variant="secondary">{row.count}</Badge>
                       </div>
                     ))}
-                    {!projectByStatus.length && <EmptyState />}
+                    {!topFixers.length && <p className="text-sm text-gray-500">No fixers found.</p>}
                   </div>
                 </CardContent>
               </Card>
@@ -632,9 +657,15 @@ export default function App() {
                               </a>
                             </div>
                           </TableCell>
-                          <TableCell>{open}</TableCell>
-                          <TableCell>{closed}</TableCell>
-                          <TableCell>{row.issues.length}</TableCell>
+                          <TableCell>
+                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setAssigneeIssueTitle(`${row.assignee.login} - Open`); setAssigneeIssueList(row.issues.filter(i => i.state === "OPEN"));}}>{open}</a>
+                          </TableCell>
+                          <TableCell>
+                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setAssigneeIssueTitle(`${row.assignee.login} - Closed`); setAssigneeIssueList(row.issues.filter(i => i.state === "CLOSED"));}}>{closed}</a>
+                          </TableCell>
+                          <TableCell>
+                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setAssigneeIssueTitle(`${row.assignee.login} - All`); setAssigneeIssueList(row.issues);}}>{row.issues.length}</a>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -645,6 +676,22 @@ export default function App() {
                 </Table>
               </CardContent>
             </Card>
+            {assigneeIssueList.length > 0 && (
+              <div className="mt-4">
+                <Card>
+                  <CardHeader><CardTitle>{assigneeIssueTitle}</CardTitle></CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2 max-h-96 overflow-auto">
+                      {assigneeIssueList.map(iss => (
+                        <li key={iss.id} className="text-sm">
+                          <a href={iss.url} target="_blank" rel="noreferrer" className="hover:underline">#{iss.number} {iss.title}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
 
           {/* BY TAGS */}
@@ -672,9 +719,15 @@ export default function App() {
                               <Badge variant="outline">{label}</Badge>
                             </div>
                           </TableCell>
-                          <TableCell>{open}</TableCell>
-                          <TableCell>{closed}</TableCell>
-                          <TableCell>{list.length}</TableCell>
+                          <TableCell>
+                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setTagIssueTitle(`${label} - Open`); setTagIssueList(list.filter(i => i.state === "OPEN"));}}>{open}</a>
+                          </TableCell>
+                          <TableCell>
+                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setTagIssueTitle(`${label} - Closed`); setTagIssueList(list.filter(i => i.state === "CLOSED"));}}>{closed}</a>
+                          </TableCell>
+                          <TableCell>
+                            <a href="#" className="text-blue-600 underline" onClick={e => {e.preventDefault(); setTagIssueTitle(`${label} - All`); setTagIssueList(list);}}>{list.length}</a>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -685,14 +738,41 @@ export default function App() {
                 </Table>
               </CardContent>
             </Card>
+            {tagIssueList.length > 0 && (
+              <div className="mt-4">
+                <Card>
+                  <CardHeader><CardTitle>{tagIssueTitle}</CardTitle></CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2 max-h-96 overflow-auto">
+                      {tagIssueList.map(iss => (
+                        <li key={iss.id} className="text-sm">
+                          <a href={iss.url} target="_blank" rel="noreferrer" className="hover:underline">#{iss.number} {iss.title}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
 
           {/* PROJECT BOARD */}
           <TabsContent value="project-board" className="mt-6">
-            <div className="mb-4 text-sm text-gray-600 flex items-center gap-2">
-              <FolderKanban className="w-4 h-4"/> Columns use the project field named <code className="px-1 bg-gray-100 rounded">Status</code>.
+            <div className="mb-4 flex items-center gap-2 flex-wrap text-sm text-gray-600">
+              <FolderKanban className="w-4 h-4"/>
+              Columns use the project field named <code className="px-1 bg-gray-100 rounded">Status</code>
+              <select
+                value={selectedProjectId}
+                onChange={e => setSelectedProjectId(e.target.value)}
+                className="border rounded-md text-sm px-2 py-1 ml-auto"
+              >
+                <option value="">Select project</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.title}</option>
+                ))}
+              </select>
             </div>
-            <div className="grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-4">
+            <div className="grid lg:grid-cols-5 md:grid-cols-3 sm:grid-cols-2 gap-4">
               {projectBoardByStatus.map(([status, list]) => (
                 <Card key={status} className="rounded-2xl">
                   <CardHeader>
@@ -706,7 +786,7 @@ export default function App() {
                       {list.map(iss => (
                         <li key={iss.id} className="p-3 border rounded-xl bg-white shadow-sm">
                           <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline block">#{iss.number} {iss.title}</a>
-                          <div className="text-xs text-gray-500">{iss.repository} • {fmtDate(iss.createdAt)} • {iss.project}</div>
+                          <div className="text-xs text-gray-500">{iss.repository} • {fmtDate(iss.createdAt)}</div>
                         </li>
                       ))}
                     </ul>
@@ -719,34 +799,50 @@ export default function App() {
             </div>
           </TabsContent>
 
-          {/* BY PROJECTS (REPOSITORIES) */}
-          <TabsContent value="by-projects" className="mt-6">
-            <FilterBar query={query} setQuery={setQuery} />
+          {/* ALL ISSUES */}
+          <TabsContent value="all-issues" className="mt-6">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
+                <Input placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-60"/>
+              </div>
+              <select value={filterState} onChange={e=>setFilterState(e.target.value)} className="border rounded-md text-sm px-2 py-1">
+                <option value="">All States</option>
+                <option value="OPEN">Open</option>
+                <option value="CLOSED">Closed</option>
+              </select>
+              <select value={filterProjectStatus} onChange={e=>setFilterProjectStatus(e.target.value)} className="border rounded-md text-sm px-2 py-1">
+                <option value="">All Project Statuses</option>
+                {projectStatusOptions.map(st => <option key={st} value={st}>{st}</option>)}
+              </select>
+              <select value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="border rounded-md text-sm px-2 py-1">
+                <option value="">All Assignees</option>
+                {assigneeOptions.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <select value={filterTag} onChange={e=>setFilterTag(e.target.value)} className="border rounded-md text-sm px-2 py-1">
+                <option value="">All Tags</option>
+                {tagOptions.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
             <div className="grid md:grid-cols-2 gap-4">
-              {byRepo.map(([repoName, list]) => (
-                <Card key={repoName}>
+              {filteredAllIssues.map(iss => (
+                <Card key={iss.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="truncate">{repoName}</CardTitle>
-                      <Badge variant="secondary">{list.length}</Badge>
+                      <CardTitle className="truncate"><a href={iss.url} target="_blank" rel="noreferrer" className="hover:underline">#{iss.number} {iss.title}</a></CardTitle>
+                      <Badge variant="secondary">{iss.state}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <ul className="space-y-3 max-h-96 overflow-auto">
-                      {list.map(iss => (
-                        <li key={iss.id} className="border rounded-xl p-3">
-                          <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline">#{iss.number} {iss.title}</a>
-                          <div className="text-xs text-gray-500">{fmtDate(iss.createdAt)} • {iss.state}</div>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {iss.labels.map(l => <Badge key={l.id} variant="outline">{l.name}</Badge>)}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="text-xs text-gray-500 mb-1">{iss.repository?.nameWithOwner}</div>
+                    {iss.project_status && <div className="text-xs text-gray-500 mb-1">Status: {iss.project_status}</div>}
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {iss.labels.map(l => <Badge key={l.id} variant="outline">{l.name}</Badge>)}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
-              {!byRepo.length && <Card><CardContent className="py-10"><EmptyState /></CardContent></Card>}
+              {!filteredAllIssues.length && <Card><CardContent className="py-10"><EmptyState /></CardContent></Card>}
             </div>
           </TabsContent>
         </Tabs>
