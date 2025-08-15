@@ -126,6 +126,41 @@ const ORG_REPOS_ISSUES = `
   }
 `;
 
+const ORG_PROJECTS_ISSUES = `
+  query OrgProjects($org: String!) {
+    organization(login: $org) {
+      projectsV2(first: 30) {
+        nodes {
+          id
+          title
+          items(first: 100) {
+            nodes {
+              id
+              status: fieldValueByName(name: "Status") {
+                ... on ProjectV2ItemFieldSingleSelectValue { name }
+              }
+              content {
+                ... on Issue {
+                  id
+                  number
+                  title
+                  url
+                  state
+                  createdAt
+                  closedAt
+                  repository { nameWithOwner url }
+                  assignees(first: 10) { nodes { login avatarUrl url } }
+                  labels(first: 20) { nodes { id name color } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 // --- Main App -------------------------------------------------------------
 export default function App() {
   const [org, setOrg] = useState("");
@@ -133,12 +168,14 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [repos, setRepos] = useState([]); // [{id, name, url, issues: [...] }]
+  const [projects, setProjects] = useState([]); // [{id, title, issues:[...]}]
   const [orgMeta, setOrgMeta] = useState(null);
 
     const loadData = async () => {
     setLoading(true);
     setError("");
     setRepos([]);
+    setProjects([]);
     try {
       let allRepos = [];
       let cursor = null;
@@ -170,6 +207,32 @@ export default function App() {
         cursor = orgNode.repositories.pageInfo.endCursor;
       }
       setRepos(allRepos);
+
+      const projData = await githubGraphQL(token, ORG_PROJECTS_ISSUES, { org });
+      const projNodes = projData.organization?.projectsV2?.nodes || [];
+      const projList = projNodes.map(p => ({
+        id: p.id,
+        title: p.title,
+        issues: (p.items?.nodes || [])
+          .filter(n => n.content?.__typename === "Issue")
+          .map(n => {
+            const i = n.content;
+            return {
+              id: i.id,
+              number: i.number,
+              title: i.title,
+              url: i.url,
+              state: i.state,
+              createdAt: i.createdAt,
+              closedAt: i.closedAt,
+              repository: i.repository,
+              assignees: i.assignees?.nodes || [],
+              labels: i.labels?.nodes || [],
+              status: n.status?.name || "Backlog",
+            };
+          }),
+      }));
+      setProjects(projList);
     } catch (e) {
       setError(e.message || String(e));
     } finally {
@@ -255,7 +318,7 @@ export default function App() {
   }, [allIssues]);
 
   // Infer Project Status from labels like "Status: Backlog/In Progress/Done"; fallback to "Backlog"
-  const byStatus = useMemo(() => {
+  const allByStatus = useMemo(() => {
     const colMap = new Map();
     function col(name) { if (!colMap.has(name)) colMap.set(name, []); return colMap.get(name); }
     for (const iss of allIssues) {
@@ -276,6 +339,19 @@ export default function App() {
     }
     return Array.from(out.entries()).sort((a,b) => b[1].length - a[1].length);
   }, [allIssues]);
+
+  const [selectedProject, setSelectedProject] = useState("");
+  const projectByStatus = useMemo(() => {
+    if (!selectedProject) return [];
+    const proj = projects.find(p => p.id === selectedProject);
+    if (!proj) return [];
+    const colMap = new Map();
+    function col(name) { if (!colMap.has(name)) colMap.set(name, []); return colMap.get(name); }
+    for (const iss of proj.issues) {
+      col(iss.status || "Backlog").push(iss);
+    }
+    return Array.from(colMap.entries()).sort((a,b) => a[0].localeCompare(b[0]));
+  }, [selectedProject, projects]);
 
   // Search filter for tables
   const [query, setQuery] = useState("");
@@ -435,11 +511,23 @@ export default function App() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Project Issues (by Status)</CardTitle>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle>Project Issues (by Status)</CardTitle>
+                    <select
+                      value={selectedProject}
+                      onChange={e => setSelectedProject(e.target.value)}
+                      className="border rounded-md text-sm px-2 py-1"
+                    >
+                      <option value="">Select project</option>
+                      {projects.map(p => (
+                        <option key={p.id} value={p.id}>{p.title}</option>
+                      ))}
+                    </select>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-3">
-                    {byStatus.map(([status, list]) => (
+                    {projectByStatus.map(([status, list]) => (
                       <div key={status} className="border rounded-2xl p-3">
                         <div className="flex items-center justify-between mb-2">
                           <div className="font-medium">{status}</div>
@@ -455,7 +543,7 @@ export default function App() {
                         </ul>
                       </div>
                     ))}
-                    {!byStatus.length && <EmptyState />}
+                    {!projectByStatus.length && <EmptyState />}
                   </div>
                 </CardContent>
               </Card>
@@ -554,7 +642,7 @@ export default function App() {
               <FolderKanban className="w-4 h-4"/> Columns are inferred from labels like <code className="px-1 bg-gray-100 rounded">Status: Backlog/In Progress/Done</code>.
             </div>
             <div className="grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-4">
-              {byStatus.map(([status, list]) => (
+              {allByStatus.map(([status, list]) => (
                 <Card key={status} className="rounded-2xl">
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -577,7 +665,7 @@ export default function App() {
                   </CardContent>
                 </Card>
               ))}
-              {!byStatus.length && (
+              {!allByStatus.length && (
                 <Card><CardContent className="py-10"><EmptyState /></CardContent></Card>
               )}
             </div>
