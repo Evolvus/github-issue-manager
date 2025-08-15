@@ -360,6 +360,7 @@ export default function App() {
   }, [allIssues]);
 
   const [range, setRange] = useState("month"); // week | month | year
+  const [burnRange, setBurnRange] = useState("month"); // for burn chart
 
   const openedClosedSeries = useMemo(() => {
     if (range === "year") {
@@ -389,8 +390,46 @@ export default function App() {
     }
   }, [allIssues, range]);
 
+  const burnDownSeries = useMemo(() => {
+    if (burnRange === "year") {
+      const months = monthsRange(12);
+      return months.map(m => {
+        const start = new Date(m + "-01");
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + 1);
+        const open = allIssues.filter(i => {
+          const created = new Date(i.createdAt);
+          const closed = i.closedAt ? new Date(i.closedAt) : null;
+          return created < end && (!closed || closed >= end);
+        }).length;
+        return { date: m, open };
+      });
+    } else {
+      const days = burnRange === "week" ? daysRange(7) : daysRange(30);
+      return days.map(d => {
+        const end = new Date(d);
+        end.setDate(end.getDate() + 1);
+        const open = allIssues.filter(i => {
+          const created = new Date(i.createdAt);
+          const closed = i.closedAt ? new Date(i.closedAt) : null;
+          return created < end && (!closed || closed >= end);
+        }).length;
+        return { date: d, open };
+      });
+    }
+  }, [allIssues, burnRange]);
+
   const formatXAxis = (d) => {
     if (range === "year") {
+      return new Date(d + "-01").toLocaleString("default", { month: "short" });
+    }
+    const day = d.slice(8, 10);
+    const month = d.slice(5, 7);
+    return `${day}/${month}`;
+  };
+
+  const formatBurnXAxis = (d) => {
+    if (burnRange === "year") {
       return new Date(d + "-01").toLocaleString("default", { month: "short" });
     }
     const day = d.slice(8, 10);
@@ -759,6 +798,48 @@ export default function App() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Sprint Burn Chart</CardTitle>
+                  <div className="flex gap-2">
+                    <Button
+                      className={burnRange === "week" ? "bg-black text-white" : "bg-white text-black border"}
+                      onClick={() => setBurnRange("week")}
+                    >
+                      Week
+                    </Button>
+                    <Button
+                      className={burnRange === "month" ? "bg-black text-white" : "bg-white text-black border"}
+                      onClick={() => setBurnRange("month")}
+                    >
+                      Month
+                    </Button>
+                    <Button
+                      className={burnRange === "year" ? "bg-black text-white" : "bg-white text-black border"}
+                      onClick={() => setBurnRange("year")}
+                    >
+                      Year
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={burnDownSeries}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tickFormatter={formatBurnXAxis} />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="open" name="Open Issues" stroke="#3b82f6" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* BY ASSIGNEE */}
@@ -1012,7 +1093,7 @@ export default function App() {
                     </div>
                     <div className="space-y-2 max-h-60 overflow-auto pr-1">
                       {sp.issues.map(iss => (
-                        <IssueCard key={iss.id} issue={iss} />
+                        <IssueCard key={iss.id} issue={iss} showMilestone={false} />
                       ))}
                     </div>
                   </CardContent>
@@ -1079,7 +1160,7 @@ export default function App() {
   );
 }
 
-function IssueCard({ issue }) {
+function IssueCard({ issue, showMilestone = true }) {
   const typeLabel = issue.labels.find(l => /^type:\s*/i.test(l.name));
   const otherLabels = issue.labels.filter(l => l !== typeLabel);
   return (
@@ -1096,7 +1177,7 @@ function IssueCard({ issue }) {
       </CardHeader>
       <CardContent>
         <div className="text-xs text-gray-500 mb-1">{issue.repository?.nameWithOwner}</div>
-        {issue.milestone && (
+        {showMilestone && issue.milestone && (
           <div className="text-xs text-gray-500 mb-1">Milestone: {issue.milestone.title}</div>
         )}
         {issue.project_status && (
@@ -1128,7 +1209,7 @@ function IssueCard({ issue }) {
         <div className="mt-2 flex items-center gap-1">
           {issue.assignees.length ? (
             issue.assignees.map(a => (
-              <Avatar key={a.login} className="w-6 h-6">
+              <Avatar key={a.login} className="w-6 h-6" title={a.login}>
                 <AvatarImage src={a.avatarUrl} />
                 <AvatarFallback>{initials(a.login)}</AvatarFallback>
               </Avatar>
