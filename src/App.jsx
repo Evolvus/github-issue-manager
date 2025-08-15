@@ -78,6 +78,7 @@ const ORG_REPOS_ISSUES = `
               assignees(first: 10) { nodes { login avatarUrl url } }
               labels(first: 20) { nodes { id name color } }
               milestone { id title url dueOn description }
+              issueType { id name color }
             }
           }
         }
@@ -116,6 +117,7 @@ const PROJECT_ITEMS = `
                 state
                 createdAt
                 repository { nameWithOwner }
+                issueType { id name color }
               }
             }
             fieldValues(first: 20) {
@@ -177,6 +179,7 @@ async function fetchProjectsWithStatus(token, org) {
             createdAt: issue.createdAt,
             repository: issue.repository?.nameWithOwner || "",
             project_status: status,
+            issueType: issue.issueType || null,
           };
         })
         .filter(Boolean);
@@ -189,6 +192,18 @@ async function fetchProjectsWithStatus(token, org) {
   return out;
 }
 
+async function fetchIssueTypes(token, org) {
+  const res = await fetch(`https://api.github.com/orgs/${org}/issue-types`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+    },
+  });
+  if (!res.ok) throw new Error(`GitHub REST error: ${res.status}`);
+  const data = await res.json();
+  return data?.issue_types || data;
+}
+
 // --- Main App -------------------------------------------------------------
 export default function App() {
   const [org, setOrg] = useState("");
@@ -198,6 +213,7 @@ export default function App() {
   const [repos, setRepos] = useState([]); // [{id, name, url, issues: [...] }]
   const [orgMeta, setOrgMeta] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [issueTypes, setIssueTypes] = useState([]);
 
   // Chart state
   const [range, setRange] = useState("month"); // week | month | year
@@ -210,15 +226,18 @@ export default function App() {
   const [filterAssignee, setFilterAssignee] = useState("");
   const [filterTag, setFilterTag] = useState("");
   const [filterMilestone, setFilterMilestone] = useState("");
+  const [filterIssueType, setFilterIssueType] = useState("");
 
   const loadData = async () => {
     setLoading(true);
     setError("");
     setRepos([]);
     setProjects([]);
+    setIssueTypes([]);
     try {
       let allRepos = [];
       let cursor = null;
+      const typesPromise = fetchIssueTypes(token, org);
       for (let page = 0; page < 4; page++) { // up to ~120 repos (4 * 30)
         const data = await githubGraphQL(token, ORG_REPOS_ISSUES, { org, after: cursor });
         const orgNode = data.organization;
@@ -242,6 +261,7 @@ export default function App() {
             assignees: i.assignees?.nodes || [],
             labels: i.labels?.nodes || [],
             milestone: i.milestone || null,
+            issueType: i.issueType || null,
           }))
         })));
         if (!orgNode.repositories.pageInfo.hasNextPage) break;
@@ -250,6 +270,8 @@ export default function App() {
       setRepos(allRepos);
       const boards = await fetchProjectsWithStatus(token, org);
       setProjects(boards);
+      const types = await typesPromise;
+      setIssueTypes(types);
     } catch (e) {
       setError(e.message || String(e));
     } finally {
@@ -273,6 +295,7 @@ export default function App() {
             labels: [],
             milestone: null,
             repository: { nameWithOwner: i.repository },
+            issueType: i.issueType || null,
           });
         }
       });
@@ -333,6 +356,10 @@ export default function App() {
     if (hasNone) arr.unshift("(none)");
     return arr;
   }, [allIssuesWithStatus]);
+
+  const issueTypeOptions = useMemo(() => {
+    return issueTypes.map(t => t.name).sort();
+  }, [issueTypes]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -424,7 +451,7 @@ export default function App() {
               />
             } />
             <Route path="/all-issues" element={
-              <AllIssues 
+              <AllIssues
                 allIssuesWithStatus={allIssuesWithStatus}
                 query={query}
                 setQuery={setQuery}
@@ -438,10 +465,13 @@ export default function App() {
                 setFilterTag={setFilterTag}
                 filterMilestone={filterMilestone}
                 setFilterMilestone={setFilterMilestone}
+                filterIssueType={filterIssueType}
+                setFilterIssueType={setFilterIssueType}
                 projectStatusOptions={projectStatusOptions}
                 assigneeOptions={assigneeOptions}
                 tagOptions={tagOptions}
                 milestoneOptions={milestoneOptions}
+                issueTypeOptions={issueTypeOptions}
               />
             } />
             <Route path="*" element={<Navigate to="/" replace />} />

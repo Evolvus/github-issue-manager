@@ -41,12 +41,15 @@ export default function AllIssues({
   setFilterProjectStatus,
   filterAssignee,
   setFilterAssignee,
+  filterIssueType,
+  setFilterIssueType,
   filterTag,
   setFilterTag,
   filterMilestone,
   setFilterMilestone,
   projectStatusOptions,
   assigneeOptions,
+  issueTypeOptions,
   tagOptions,
   milestoneOptions
 }) {
@@ -59,6 +62,7 @@ export default function AllIssues({
         (filterAssignee === "(unassigned)"
           ? i.assignees.length === 0
           : i.assignees.some(a => a.login === filterAssignee))) &&
+      (!filterIssueType || i.issueType?.name === filterIssueType) &&
       (!filterTag || i.labels.some(l => l.name === filterTag)) &&
       (!filterMilestone ||
         (filterMilestone === "(none)"
@@ -71,7 +75,7 @@ export default function AllIssues({
         i.labels.some(l => l.name.toLowerCase().includes(q))
       )
     );
-  }, [allIssuesWithStatus, filterState, filterProjectStatus, filterAssignee, filterTag, filterMilestone, query]);
+  }, [allIssuesWithStatus, filterState, filterProjectStatus, filterAssignee, filterIssueType, filterTag, filterMilestone, query]);
 
   return (
     <div className="space-y-6">
@@ -92,6 +96,10 @@ export default function AllIssues({
         <select value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="border rounded-md text-sm px-2 py-1">
           <option value="">All Assignees</option>
           {assigneeOptions.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select value={filterIssueType} onChange={e=>setFilterIssueType(e.target.value)} className="border rounded-md text-sm px-2 py-1">
+          <option value="">All Types</option>
+          {issueTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
         <select value={filterTag} onChange={e=>setFilterTag(e.target.value)} className="border rounded-md text-sm px-2 py-1">
           <option value="">All Tags</option>
