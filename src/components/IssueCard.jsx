@@ -46,8 +46,8 @@ export default function IssueCard({ issue, showMilestone = true }) {
             <span
               className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
               style={{
-                backgroundColor: `#${(issue.issueType.color || "").replace(/^#/, "")}`,
-                color: getContrastColor((issue.issueType.color || "").replace(/^#/, "")),
+                backgroundColor: `#${(issue.issueType.color || "6b7280").replace(/^#/, "")}`,
+                color: getContrastColor((issue.issueType.color || "6b7280").replace(/^#/, "")),
               }}
             >
               {issue.issueType.name}

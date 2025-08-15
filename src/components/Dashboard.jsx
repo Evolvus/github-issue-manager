@@ -6,7 +6,19 @@ import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { ExternalLink, Search } from "lucide-react";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 
 // Helper functions
 function fmtDate(iso) {
@@ -185,6 +197,17 @@ export default function Dashboard({
     return Array.from(map.values()).sort((a,b) => b.count - a.count).slice(0,10);
   }, [allIssues]);
 
+  const issueTypeData = useMemo(() => {
+    const map = new Map();
+    for (const iss of allIssues) {
+      const name = iss.issueType?.name || "(none)";
+      const color = (iss.issueType?.color || "6b7280").replace(/^#/, "");
+      if (!map.has(name)) map.set(name, { name, value: 0, color });
+      map.get(name).value++;
+    }
+    return Array.from(map.values());
+  }, [allIssues]);
+
   const stats = useMemo(() => {
     const open = allIssuesWithStatus.filter(i => i.state === "OPEN").length;
     const closed = allIssuesWithStatus.filter(i => i.state === "CLOSED").length;
@@ -239,7 +262,7 @@ export default function Dashboard({
         </Card>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-4 gap-4">
         <Card className="md:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -290,6 +313,31 @@ export default function Dashboard({
               ))}
               {!top7Assignees.length && <p className="text-sm text-gray-500">No assignees found.</p>}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Issue Types</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {issueTypeData.length ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={issueTypeData} dataKey="value" nameKey="name" label>
+                      {issueTypeData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={`#${entry.color}`} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No issue types found.</p>
+            )}
           </CardContent>
         </Card>
       </div>
