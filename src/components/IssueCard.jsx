@@ -11,15 +11,22 @@ function initials(str = "?") {
 }
 
 function getContrastColor(hexColor) {
-  const r = parseInt(hexColor.substr(0, 2), 16);
-  const g = parseInt(hexColor.substr(2, 2), 16);
-  const b = parseInt(hexColor.substr(4, 2), 16);
+  let hex = hexColor.replace(/^#/, "");
+  if (hex.length === 3) {
+    hex = hex.split("").map(ch => ch + ch).join("");
+  }
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  if ([r, g, b].some(isNaN)) return "#000000";
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.5 ? '#000000' : '#ffffff';
 }
 
 export default function IssueCard({ issue, showMilestone = true }) {
   const otherLabels = issue.labels.filter(l => !/^type:\s*/i.test(l.name));
+  const typeColorRaw = (issue.issueType?.color || "6b7280").replace(/^#/, "");
+  const typeColor = typeColorRaw.length === 3 ? typeColorRaw.split("").map(c => c + c).join("") : typeColorRaw;
   
   return (
     <Card>
@@ -46,8 +53,8 @@ export default function IssueCard({ issue, showMilestone = true }) {
             <span
               className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
               style={{
-                backgroundColor: `#${(issue.issueType.color || "6b7280").replace(/^#/, "")}`,
-                color: getContrastColor((issue.issueType.color || "6b7280").replace(/^#/, "")),
+                backgroundColor: `#${typeColor}`,
+                color: getContrastColor(typeColor),
               }}
             >
               {issue.issueType.name}

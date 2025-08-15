@@ -178,34 +178,27 @@ export default function Dashboard({
     }
     return Array.from(out.values()).sort((a,b) => b.issues.length - a.issues.length);
   }, [allIssues]);
-
-  const top7Assignees = useMemo(() => byAssignee.slice(0, 7), [byAssignee]);
-
-  const topFixers = useMemo(() => {
-    const map = new Map();
-    for (const iss of allIssues) {
-      if (iss.state !== "CLOSED") continue;
-      const assignees = iss.assignees.length ? iss.assignees : [{ login: "(unassigned)", avatarUrl: "", url: "#" }];
-      for (const a of assignees) {
-        const key = a.login;
-        if (!map.has(key)) map.set(key, { assignee: a, count: 0, issues: [] });
-        const row = map.get(key);
-        row.count++;
-        row.issues.push(iss);
-      }
-    }
-    return Array.from(map.values()).sort((a,b) => b.count - a.count).slice(0,10);
-  }, [allIssues]);
+  const topAssignees = useMemo(() => byAssignee.slice(0, 10), [byAssignee]);
 
   const issueTypeData = useMemo(() => {
     const map = new Map();
     for (const iss of allIssues) {
+      if (iss.state !== "OPEN") continue;
       const name = iss.issueType?.name || "(none)";
-      const color = (iss.issueType?.color || "6b7280").replace(/^#/, "");
-      if (!map.has(name)) map.set(name, { name, value: 0, color });
-      map.get(name).value++;
+      const key = name.toLowerCase();
+      if (!map.has(key)) map.set(key, { name, value: 0 });
+      map.get(key).value++;
     }
-    return Array.from(map.values());
+    const colorMap = {
+      bug: "ef4444",
+      feature: "22c55e",
+      task: "3b82f6",
+      "(none)": "a52a2a",
+    };
+    return Array.from(map.values()).map(row => ({
+      ...row,
+      color: colorMap[row.name.toLowerCase()] || "6b7280",
+    }));
   }, [allIssues]);
 
   const stats = useMemo(() => {
@@ -293,31 +286,6 @@ export default function Dashboard({
 
         <Card>
           <CardHeader>
-            <CardTitle>Top 7 Assignees</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {top7Assignees.map((row) => (
-                <div key={row.assignee.login} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="w-7 h-7">
-                      <AvatarImage src={row.assignee.avatarUrl} />
-                      <AvatarFallback>{initials(row.assignee.login)}</AvatarFallback>
-                    </Avatar>
-                    <a href={row.assignee.url} target="_blank" rel="noreferrer" className="text-sm hover:underline">
-                      {row.assignee.login}
-                    </a>
-                  </div>
-                  <Badge variant="secondary">{row.issues.length}</Badge>
-                </div>
-              ))}
-              {!top7Assignees.length && <p className="text-sm text-gray-500">No assignees found.</p>}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Issue Types</CardTitle>
           </CardHeader>
           <CardContent>
@@ -379,11 +347,11 @@ export default function Dashboard({
 
         <Card>
           <CardHeader>
-            <CardTitle>Top 10 Issue Fixers</CardTitle>
+            <CardTitle>Top 10 Assignees</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {topFixers.map(row => (
+              {topAssignees.map(row => (
                 <div key={row.assignee.login} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Avatar className="w-7 h-7">
@@ -394,10 +362,10 @@ export default function Dashboard({
                       {row.assignee.login}
                     </a>
                   </div>
-                  <Badge variant="secondary">{row.count}</Badge>
+                  <Badge variant="secondary">{row.issues.length}</Badge>
                 </div>
               ))}
-              {!topFixers.length && <p className="text-sm text-gray-500">No fixers found.</p>}
+              {!topAssignees.length && <p className="text-sm text-gray-500">No assignees found.</p>}
             </div>
           </CardContent>
         </Card>
