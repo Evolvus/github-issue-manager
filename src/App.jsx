@@ -525,7 +525,7 @@ export default function App() {
           </Card>
         )}
 
-        <Tabs defaultValue="dashboard">
+        <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="dashboard">
           <TabsList className="grid grid-cols-6 w-full sm:w-auto">
 
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
