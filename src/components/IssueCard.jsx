@@ -19,8 +19,7 @@ function getContrastColor(hexColor) {
 }
 
 export default function IssueCard({ issue, showMilestone = true }) {
-  const typeLabel = issue.labels.find(l => /^type:\s*/i.test(l.name));
-  const otherLabels = issue.labels.filter(l => l !== typeLabel);
+  const otherLabels = issue.labels.filter(l => !/^type:\s*/i.test(l.name));
   
   return (
     <Card>
@@ -42,13 +41,16 @@ export default function IssueCard({ issue, showMilestone = true }) {
         {issue.project_status && (
           <div className="text-xs text-gray-500 mb-1">Status: {issue.project_status}</div>
         )}
-        {typeLabel && (
+        {issue.issueType && (
           <div className="mt-1">
             <span
               className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-              style={{ backgroundColor: `#${typeLabel.color}`, color: getContrastColor(typeLabel.color) }}
+              style={{
+                backgroundColor: `#${(issue.issueType.color || "").replace(/^#/, "")}`,
+                color: getContrastColor((issue.issueType.color || "").replace(/^#/, "")),
+              }}
             >
-              {typeLabel.name.replace(/^Type:\s*/i, "")}
+              {issue.issueType.name}
             </span>
           </div>
         )}
