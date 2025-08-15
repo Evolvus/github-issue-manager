@@ -1,6 +1,13 @@
 import React from "react";
-export function Avatar({ className="", children }) {
-  return <div className={`rounded-full overflow-hidden bg-gray-200 ${className}`}>{children}</div>;
+export function Avatar({ className="", children, ...props }) {
+  return (
+    <div
+      className={`rounded-full overflow-hidden bg-gray-200 ${className}`}
+      {...props}
+    >
+      {children}
+    </div>
+  );
 }
 export function AvatarImage({ src, alt="" }) {
   return <img src={src} alt={alt} className="w-full h-full object-cover" />;
