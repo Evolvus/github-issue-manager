@@ -6,30 +6,45 @@ import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Search } from "lucide-react";
 
-export default function ByTags({ 
-  allIssues, 
-  query, 
-  setQuery, 
+function getContrastColor(hex = "808080") {
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? "#000000" : "#ffffff";
+}
+
+export default function ByTags({
+  allIssues,
+  query,
+  setQuery,
   setFilterAssignee,
   setFilterState,
   setFilterProjectStatus,
-  setFilterTag
+  setFilterTag,
+  setFilterIssueType,
 }) {
   const byLabel = useMemo(() => {
     const out = new Map();
     for (const iss of allIssues) {
       if (!iss.labels.length) {
-        if (!out.has("(no label)")) out.set("(no label)", []);
-        out.get("(no label)").push(iss);
+        const key = "(no label)";
+        if (!out.has(key)) out.set(key, { label: { name: key, color: "808080" }, issues: [] });
+        out.get(key).issues.push(iss);
       } else {
         for (const l of iss.labels) {
-          if (!out.has(l.name)) out.set(l.name, []);
-          out.get(l.name).push(iss);
+          if (!out.has(l.name)) out.set(l.name, { label: l, issues: [] });
+          out.get(l.name).issues.push(iss);
         }
       }
     }
-    return Array.from(out.entries()).sort((a,b) => b[1].length - a[1].length);
+    return Array.from(out.values()).sort((a, b) => b.issues.length - a.issues.length);
   }, [allIssues]);
+
+  const filteredLabels = useMemo(() => {
+    const q = query.toLowerCase();
+    return byLabel.filter(row => row.label.name.toLowerCase().includes(q));
+  }, [byLabel, query]);
 
   const navigate = useNavigate();
 
@@ -38,6 +53,7 @@ export default function ByTags({
     setFilterState(state);
     setFilterProjectStatus(projectStatus);
     setFilterAssignee(assignee);
+    setFilterIssueType("");
     setQuery("");
     navigate("/all-issues");
   };
@@ -47,7 +63,7 @@ export default function ByTags({
       <div className="flex items-center gap-2">
         <div className="relative">
           <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
-          <Input placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-72"/>
+          <Input placeholder="Search tags..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-72"/>
         </div>
       </div>
       
@@ -63,14 +79,19 @@ export default function ByTags({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {byLabel.map(([label, list]) => {
-                const open = list.filter(i => i.state === "OPEN").length;
-                const closed = list.filter(i => i.state === "CLOSED").length;
+              {filteredLabels.map(row => {
+                const open = row.issues.filter(i => i.state === "OPEN").length;
+                const closed = row.issues.filter(i => i.state === "CLOSED").length;
+                const color = row.label.color || "808080";
                 return (
-                  <TableRow key={label}>
+                  <TableRow key={row.label.name}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline">{label}</Badge>
+                        <Badge
+                          style={{ backgroundColor: `#${color}`, color: getContrastColor(color) }}
+                        >
+                          {row.label.name}
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -79,7 +100,7 @@ export default function ByTags({
                         className="text-blue-600 underline"
                         onClick={e => {
                           e.preventDefault();
-                          handleFilterClick(label, "OPEN");
+                          handleFilterClick(row.label.name, "OPEN");
                         }}
                       >
                         {open}
@@ -91,7 +112,7 @@ export default function ByTags({
                         className="text-blue-600 underline"
                         onClick={e => {
                           e.preventDefault();
-                          handleFilterClick(label, "CLOSED");
+                          handleFilterClick(row.label.name, "CLOSED");
                         }}
                       >
                         {closed}
@@ -103,16 +124,16 @@ export default function ByTags({
                         className="text-blue-600 underline"
                         onClick={e => {
                           e.preventDefault();
-                          handleFilterClick(label);
+                          handleFilterClick(row.label.name);
                         }}
                       >
-                        {list.length}
+                        {row.issues.length}
                       </a>
                     </TableCell>
                   </TableRow>
                 );
               })}
-              {!byLabel.length && (
+              {!filteredLabels.length && (
                 <TableRow><TableCell colSpan={4}><div className="text-sm text-gray-500">No data available.</div></TableCell></TableRow>
               )}
             </TableBody>

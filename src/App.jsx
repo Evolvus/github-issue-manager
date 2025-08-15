@@ -416,10 +416,11 @@ export default function App() {
                 setFilterState={setFilterState}
                 setFilterProjectStatus={setFilterProjectStatus}
                 setFilterTag={setFilterTag}
+                setFilterIssueType={setFilterIssueType}
               />
             } />
             <Route path="/by-assignee" element={
-              <ByAssignee 
+              <ByAssignee
                 allIssues={allIssues}
                 query={query}
                 setQuery={setQuery}
@@ -427,10 +428,11 @@ export default function App() {
                 setFilterState={setFilterState}
                 setFilterProjectStatus={setFilterProjectStatus}
                 setFilterTag={setFilterTag}
+                setFilterIssueType={setFilterIssueType}
               />
             } />
             <Route path="/by-tags" element={
-              <ByTags 
+              <ByTags
                 allIssues={allIssues}
                 query={query}
                 setQuery={setQuery}
@@ -438,6 +440,7 @@ export default function App() {
                 setFilterState={setFilterState}
                 setFilterProjectStatus={setFilterProjectStatus}
                 setFilterTag={setFilterTag}
+                setFilterIssueType={setFilterIssueType}
               />
             } />
             <Route path="/project-board" element={
