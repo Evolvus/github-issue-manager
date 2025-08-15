@@ -13,14 +13,15 @@ function initials(str = "?") {
   return (first + last).toUpperCase();
 }
 
-export default function ByAssignee({ 
-  allIssues, 
-  query, 
-  setQuery, 
+export default function ByAssignee({
+  allIssues,
+  query,
+  setQuery,
   setFilterAssignee,
   setFilterState,
   setFilterProjectStatus,
-  setFilterTag
+  setFilterTag,
+  setFilterIssueType,
 }) {
   const byAssignee = useMemo(() => {
     const out = new Map();
@@ -35,6 +36,11 @@ export default function ByAssignee({
     return Array.from(out.values()).sort((a,b) => b.issues.length - a.issues.length);
   }, [allIssues]);
 
+  const filteredAssignees = useMemo(() => {
+    const q = query.toLowerCase();
+    return byAssignee.filter(row => row.assignee.login.toLowerCase().includes(q));
+  }, [byAssignee, query]);
+
   const navigate = useNavigate();
 
   const handleFilterClick = (assignee, state = "", projectStatus = "", tag = "") => {
@@ -42,6 +48,7 @@ export default function ByAssignee({
     setFilterState(state);
     setFilterProjectStatus(projectStatus);
     setFilterTag(tag);
+    setFilterIssueType("");
     setQuery("");
     navigate("/all-issues");
   };
@@ -51,7 +58,7 @@ export default function ByAssignee({
       <div className="flex items-center gap-2">
         <div className="relative">
           <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
-          <Input placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-72"/>
+          <Input placeholder="Search assignees..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-72"/>
         </div>
       </div>
       
@@ -67,7 +74,7 @@ export default function ByAssignee({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {byAssignee.map(row => {
+              {filteredAssignees.map(row => {
                 const open = row.issues.filter(i => i.state === "OPEN").length;
                 const closed = row.issues.filter(i => i.state === "CLOSED").length;
                 return (
@@ -122,7 +129,7 @@ export default function ByAssignee({
                   </TableRow>
                 );
               })}
-              {!byAssignee.length && (
+              {!filteredAssignees.length && (
                 <TableRow><TableCell colSpan={4}><div className="text-sm text-gray-500">No data available.</div></TableCell></TableRow>
               )}
             </TableBody>

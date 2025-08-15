@@ -62,20 +62,21 @@ function monthsRange(n = 12) {
   return out;
 }
 
-export default function Dashboard({ 
-  allIssues, 
+export default function Dashboard({
+  allIssues,
   allIssuesWithStatus,
-  orgMeta, 
-  query, 
-  setQuery, 
-  range, 
-  setRange, 
-  burnRange, 
+  orgMeta,
+  query,
+  setQuery,
+  range,
+  setRange,
+  burnRange,
   setBurnRange,
   setFilterAssignee,
   setFilterState,
   setFilterProjectStatus,
-  setFilterTag
+  setFilterTag,
+  setFilterIssueType,
 }) {
   const openedClosedSeries = useMemo(() => {
     if (range === "year") {
@@ -201,6 +202,27 @@ export default function Dashboard({
     }));
   }, [allIssues]);
 
+  const closedIssueTypeData = useMemo(() => {
+    const map = new Map();
+    for (const iss of allIssues) {
+      if (iss.state !== "CLOSED") continue;
+      const name = iss.issueType?.name || "(none)";
+      const key = name.toLowerCase();
+      if (!map.has(key)) map.set(key, { name, value: 0 });
+      map.get(key).value++;
+    }
+    const colorMap = {
+      bug: "ef4444",
+      feature: "22c55e",
+      task: "3b82f6",
+      "(none)": "a52a2a",
+    };
+    return Array.from(map.values()).map(row => ({
+      ...row,
+      color: colorMap[row.name.toLowerCase()] || "6b7280",
+    }));
+  }, [allIssues]);
+
   const stats = useMemo(() => {
     const open = allIssuesWithStatus.filter(i => i.state === "OPEN").length;
     const closed = allIssuesWithStatus.filter(i => i.state === "CLOSED").length;
@@ -216,6 +238,7 @@ export default function Dashboard({
     setFilterState(state);
     setFilterProjectStatus(projectStatus);
     setFilterTag(tag);
+    setFilterIssueType("");
     setQuery("");
     navigate("/all-issues");
   };
@@ -296,6 +319,31 @@ export default function Dashboard({
                     <Pie data={issueTypeData} dataKey="value" nameKey="name" label>
                       {issueTypeData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={`#${entry.color}`} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No issue types found.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Closed Issues by Type</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {closedIssueTypeData.length ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={closedIssueTypeData} dataKey="value" nameKey="name" label>
+                      {closedIssueTypeData.map((entry, index) => (
+                        <Cell key={`closed-cell-${index}`} fill={`#${entry.color}`} />
                       ))}
                     </Pie>
                     <Tooltip />
