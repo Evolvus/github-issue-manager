@@ -142,6 +142,7 @@ const ORG_REPOS_ISSUES = `
               createdAt
               closedAt
               repository { nameWithOwner url }
+              issueType { id name color }
               assignees(first: 10) { nodes { login avatarUrl url } }
               labels(first: 20) { nodes { id name color } }
               milestone { id title url dueOn description }
@@ -182,7 +183,9 @@ const PROJECT_ITEMS = `
                 url
                 state
                 createdAt
+                closedAt
                 repository { nameWithOwner }
+                issueType { id name color }
               }
             }
             fieldValues(first: 20) {
@@ -242,7 +245,9 @@ async function fetchProjectsWithStatus(token, org) {
             url: issue.url,
             state: issue.state,
             createdAt: issue.createdAt,
+            closedAt: issue.closedAt,
             repository: issue.repository?.nameWithOwner || "",
+            issueType: issue.issueType || null,
             project_status: status,
           };
         })
@@ -294,11 +299,12 @@ export default function App() {
             createdAt: i.createdAt,
             closedAt: i.closedAt,
             repository: i.repository,
+            issueType: i.issueType || null,
             assignees: i.assignees?.nodes || [],
             labels: i.labels?.nodes || [],
             milestone: i.milestone || null,
           }))
-        })));
+        }))); 
         if (!orgNode.repositories.pageInfo.hasNextPage) break;
         cursor = orgNode.repositories.pageInfo.endCursor;
       }
@@ -360,6 +366,7 @@ export default function App() {
   }, [allIssues]);
 
   const [range, setRange] = useState("month"); // week | month | year
+  const [burnRange, setBurnRange] = useState("month"); // for burn chart
 
   const openedClosedSeries = useMemo(() => {
     if (range === "year") {
@@ -389,8 +396,54 @@ export default function App() {
     }
   }, [allIssues, range]);
 
+  const burnDownSeries = useMemo(() => {
+    if (burnRange === "year") {
+      const months = monthsRange(12);
+      return months.map(m => {
+        const start = new Date(m + "-01");
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + 1);
+        const open = allIssues.filter(i => {
+          const created = new Date(i.createdAt);
+          const closed = i.closedAt ? new Date(i.closedAt) : null;
+          return created < end && (!closed || closed >= end);
+        }).length;
+        const closed = allIssues.filter(i => {
+          const c = i.closedAt ? new Date(i.closedAt) : null;
+          return c && c < end;
+        }).length;
+        return { date: m, open, closed };
+      });
+    } else {
+      const days = burnRange === "week" ? daysRange(7) : daysRange(30);
+      return days.map(d => {
+        const end = new Date(d);
+        end.setDate(end.getDate() + 1);
+        const open = allIssues.filter(i => {
+          const created = new Date(i.createdAt);
+          const closed = i.closedAt ? new Date(i.closedAt) : null;
+          return created < end && (!closed || closed >= end);
+        }).length;
+        const closed = allIssues.filter(i => {
+          const c = i.closedAt ? new Date(i.closedAt) : null;
+          return c && c < end;
+        }).length;
+        return { date: d, open, closed };
+      });
+    }
+  }, [allIssues, burnRange]);
+
   const formatXAxis = (d) => {
     if (range === "year") {
+      return new Date(d + "-01").toLocaleString("default", { month: "short" });
+    }
+    const day = d.slice(8, 10);
+    const month = d.slice(5, 7);
+    return `${day}/${month}`;
+  };
+
+  const formatBurnXAxis = (d) => {
+    if (burnRange === "year") {
       return new Date(d + "-01").toLocaleString("default", { month: "short" });
     }
     const day = d.slice(8, 10);
@@ -759,6 +812,49 @@ export default function App() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Sprint Burn Chart</CardTitle>
+                  <div className="flex gap-2">
+                    <Button
+                      className={burnRange === "week" ? "bg-black text-white" : "bg-white text-black border"}
+                      onClick={() => setBurnRange("week")}
+                    >
+                      Week
+                    </Button>
+                    <Button
+                      className={burnRange === "month" ? "bg-black text-white" : "bg-white text-black border"}
+                      onClick={() => setBurnRange("month")}
+                    >
+                      Month
+                    </Button>
+                    <Button
+                      className={burnRange === "year" ? "bg-black text-white" : "bg-white text-black border"}
+                      onClick={() => setBurnRange("year")}
+                    >
+                      Year
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={burnDownSeries}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tickFormatter={formatBurnXAxis} />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="open" name="Open Issues" stroke="#3b82f6" />
+                      <Line type="monotone" dataKey="closed" name="Closed Issues" stroke="#ef4444" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* BY ASSIGNEE */}
@@ -1012,7 +1108,7 @@ export default function App() {
                     </div>
                     <div className="space-y-2 max-h-60 overflow-auto pr-1">
                       {sp.issues.map(iss => (
-                        <IssueCard key={iss.id} issue={iss} />
+                        <IssueCard key={iss.id} issue={iss} showMilestone={false} />
                       ))}
                     </div>
                   </CardContent>
@@ -1079,11 +1175,9 @@ export default function App() {
   );
 }
 
-function IssueCard({ issue }) {
-  const typeLabel = issue.labels.find(l => /^type:\s*/i.test(l.name));
-  const otherLabels = issue.labels.filter(l => l !== typeLabel);
-  return (
-    <Card>
+  function IssueCard({ issue, showMilestone = true }) {
+    return (
+      <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="truncate">
@@ -1096,39 +1190,39 @@ function IssueCard({ issue }) {
       </CardHeader>
       <CardContent>
         <div className="text-xs text-gray-500 mb-1">{issue.repository?.nameWithOwner}</div>
-        {issue.milestone && (
+        {showMilestone && issue.milestone && (
           <div className="text-xs text-gray-500 mb-1">Milestone: {issue.milestone.title}</div>
         )}
-        {issue.project_status && (
-          <div className="text-xs text-gray-500 mb-1">Status: {issue.project_status}</div>
-        )}
-        {typeLabel && (
-          <div className="mt-1">
-            <span
-              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-              style={{ backgroundColor: `#${typeLabel.color}`, color: getContrastColor(typeLabel.color) }}
-            >
-              {typeLabel.name.replace(/^Type:\s*/i, "")}
-            </span>
-          </div>
-        )}
-        {otherLabels.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {otherLabels.map(l => (
+          {issue.project_status && (
+            <div className="text-xs text-gray-500 mb-1">Status: {issue.project_status}</div>
+          )}
+          {issue.issueType && (
+            <div className="mt-1">
               <span
-                key={l.id}
                 className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                style={{ backgroundColor: `#${l.color}`, color: getContrastColor(l.color) }}
+                style={{ backgroundColor: `#${issue.issueType.color}`, color: getContrastColor(issue.issueType.color) }}
               >
-                {l.name}
+                {issue.issueType.name}
               </span>
-            ))}
-          </div>
-        )}
-        <div className="mt-2 flex items-center gap-1">
-          {issue.assignees.length ? (
-            issue.assignees.map(a => (
-              <Avatar key={a.login} className="w-6 h-6">
+            </div>
+          )}
+          {issue.labels.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {issue.labels.map(l => (
+                <span
+                  key={l.id}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: `#${l.color}`, color: getContrastColor(l.color) }}
+                >
+                  {l.name}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="mt-2 flex items-center gap-1">
+            {issue.assignees.length ? (
+              issue.assignees.map(a => (
+                <Avatar key={a.login} className="w-6 h-6" title={a.login}>
                 <AvatarImage src={a.avatarUrl} />
                 <AvatarFallback>{initials(a.login)}</AvatarFallback>
               </Avatar>
