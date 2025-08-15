@@ -126,6 +126,109 @@ const ORG_REPOS_ISSUES = `
   }
 `;
 
+const ORG_PROJECTS = `
+  query OrgProjects($org: String!, $after: String) {
+    organization(login: $org) {
+      projectsV2(first: 20, after: $after) {
+        nodes { id number title url }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+`;
+
+const PROJECT_ITEMS = `
+  query ProjectItems($pid: ID!, $after: String) {
+    node(id: $pid) {
+      ... on ProjectV2 {
+        number
+        title
+        url
+        items(first: 100, after: $after) {
+          nodes {
+            content {
+              __typename
+              ... on Issue {
+                id
+                number
+                title
+                url
+                state
+                createdAt
+                repository { nameWithOwner }
+              }
+            }
+            fieldValues(first: 20) {
+              nodes {
+                __typename
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name
+                  field {
+                    __typename
+                    ... on ProjectV2SingleSelectField { name }
+                  }
+                }
+              }
+            }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+`;
+
+async function fetchProjectsWithStatus(token, org) {
+  let projects = [];
+  let cursor = null;
+  while (true) {
+    const data = await githubGraphQL(token, ORG_PROJECTS, { org, after: cursor });
+    const nodes = data.organization?.projectsV2?.nodes || [];
+    projects = projects.concat(nodes);
+    if (!data.organization?.projectsV2?.pageInfo?.hasNextPage) break;
+    cursor = data.organization.projectsV2.pageInfo.endCursor;
+  }
+
+  const out = [];
+  for (const proj of projects) {
+    let items = [];
+    let after = null;
+    while (true) {
+      const data = await githubGraphQL(token, PROJECT_ITEMS, { pid: proj.id, after });
+      const node = data.node;
+      const nodes = node?.items?.nodes || [];
+      const rows = nodes
+        .map((item) => {
+          const issue = item.content;
+          if (!issue || issue.__typename !== "Issue") return null;
+          const status = (item.fieldValues?.nodes || [])
+            .filter((f) => f.__typename === "ProjectV2ItemFieldSingleSelectValue")
+            .map((f) => {
+              const fname = (f.field?.name || "").toLowerCase();
+              return fname === "status" ? f.name : null;
+            })
+            .find(Boolean) || null;
+          return {
+            id: issue.id,
+            number: issue.number,
+            title: issue.title,
+            url: issue.url,
+            state: issue.state,
+            createdAt: issue.createdAt,
+            repository: issue.repository?.nameWithOwner || "",
+            project_status: status,
+          };
+        })
+        .filter(Boolean);
+      items = items.concat(rows);
+      if (!node?.items?.pageInfo?.hasNextPage) break;
+      after = node.items.pageInfo.endCursor;
+    }
+    out.push({ id: proj.id, number: proj.number, title: proj.title, url: proj.url, issues: items });
+  }
+  return out;
+}
+
 // --- Main App -------------------------------------------------------------
 export default function App() {
   const [org, setOrg] = useState("");
@@ -134,11 +237,13 @@ export default function App() {
   const [error, setError] = useState("");
   const [repos, setRepos] = useState([]); // [{id, name, url, issues: [...] }]
   const [orgMeta, setOrgMeta] = useState(null);
+  const [projects, setProjects] = useState([]);
 
     const loadData = async () => {
     setLoading(true);
     setError("");
     setRepos([]);
+    setProjects([]);
     try {
       let allRepos = [];
       let cursor = null;
@@ -170,6 +275,8 @@ export default function App() {
         cursor = orgNode.repositories.pageInfo.endCursor;
       }
       setRepos(allRepos);
+      const boards = await fetchProjectsWithStatus(token, org);
+      setProjects(boards);
     } catch (e) {
       setError(e.message || String(e));
     } finally {
@@ -254,18 +361,24 @@ export default function App() {
     return Array.from(out.entries()).sort((a,b) => b[1].length - a[1].length);
   }, [allIssues]);
 
-  // Infer Project Status from labels like "Status: Backlog/In Progress/Done"; fallback to "Backlog"
-  const allByStatus = useMemo(() => {
+  const allProjectIssues = useMemo(
+    () => projects.flatMap((p) => p.issues.map((i) => ({ ...i, project: p.title }))),
+    [projects]
+  );
+
+  const projectBoardByStatus = useMemo(() => {
     const colMap = new Map();
-    function col(name) { if (!colMap.has(name)) colMap.set(name, []); return colMap.get(name); }
-    for (const iss of allIssues) {
-      const statusLabel = iss.labels.find(l => /^status\s*:/i.test(l.name));
-      const statusVal = statusLabel ? statusLabel.name.split(":")[1].trim() : "Backlog";
+    function col(name) {
+      if (!colMap.has(name)) colMap.set(name, []);
+      return colMap.get(name);
+    }
+    for (const iss of allProjectIssues) {
+      const statusVal = iss.project_status || "Backlog";
       col(statusVal).push(iss);
     }
-    const entries = Array.from(colMap.entries()).sort((a,b) => a[0].localeCompare(b[0]));
+    const entries = Array.from(colMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     return entries;
-  }, [allIssues]);
+  }, [allProjectIssues]);
 
   const byRepo = useMemo(() => {
     const out = new Map();
@@ -577,10 +690,10 @@ export default function App() {
           {/* PROJECT BOARD */}
           <TabsContent value="project-board" className="mt-6">
             <div className="mb-4 text-sm text-gray-600 flex items-center gap-2">
-              <FolderKanban className="w-4 h-4"/> Columns are inferred from labels like <code className="px-1 bg-gray-100 rounded">Status: Backlog/In Progress/Done</code>.
+              <FolderKanban className="w-4 h-4"/> Columns use the project field named <code className="px-1 bg-gray-100 rounded">Status</code>.
             </div>
             <div className="grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-4">
-              {allByStatus.map(([status, list]) => (
+              {projectBoardByStatus.map(([status, list]) => (
                 <Card key={status} className="rounded-2xl">
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -593,17 +706,14 @@ export default function App() {
                       {list.map(iss => (
                         <li key={iss.id} className="p-3 border rounded-xl bg-white shadow-sm">
                           <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline block">#{iss.number} {iss.title}</a>
-                          <div className="text-xs text-gray-500 mb-1">{iss.repository?.nameWithOwner} • {fmtDate(iss.createdAt)}</div>
-                          <div className="flex flex-wrap gap-1">
-                            {iss.labels.map(l => <Badge key={l.id} variant="outline">{l.name}</Badge>)}
-                          </div>
+                          <div className="text-xs text-gray-500">{iss.repository} • {fmtDate(iss.createdAt)} • {iss.project}</div>
                         </li>
                       ))}
                     </ul>
                   </CardContent>
                 </Card>
               ))}
-              {!allByStatus.length && (
+              {!projectBoardByStatus.length && (
                 <Card><CardContent className="py-10"><EmptyState /></CardContent></Card>
               )}
             </div>
