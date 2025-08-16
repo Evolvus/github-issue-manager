@@ -61,10 +61,10 @@ export default function ByTags({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
-          <Input placeholder="Search tags..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-72"/>
-        </div>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
+            <Input data-quick-open placeholder="Search tags..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-72"/>
+          </div>
       </div>
       
       <Card>

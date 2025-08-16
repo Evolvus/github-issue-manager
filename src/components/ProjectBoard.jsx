@@ -2,11 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Card, CardHeader, CardContent, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { FolderKanban, Download, ChevronDown } from "lucide-react";
-
-function fmtDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-GB");
-}
+import TimeAgo from "./TimeAgo";
 
 function issuesToCSV(issues) {
   const headers = ["Number", "Title", "URL", "State", "Repository", "ProjectStatus", "CreatedAt", "ClosedAt"];
@@ -95,7 +91,7 @@ export default function ProjectBoard({ projects }) {
                 {list.map(iss => (
                   <li key={iss.id} className="p-3 border rounded-xl bg-white shadow-sm" draggable onDragStart={e=>e.dataTransfer.setData('text/plain', JSON.stringify({ issueId: iss.id }))}>
                     <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline block">#{iss.number} {iss.title}</a>
-                    <div className="text-xs text-gray-500">{iss.repository} • {fmtDate(iss.createdAt)}</div>
+                      <div className="text-xs text-gray-500">{iss.repository} • <TimeAgo iso={iss.createdAt} /></div>
                   </li>
                 ))}
               </ul>

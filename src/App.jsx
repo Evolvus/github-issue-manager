@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { Card, CardHeader, CardContent, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
-import { Loader2, Github, RefreshCcw, ShieldQuestion } from "lucide-react";
+import { Loader2, Github, RefreshCcw, ShieldQuestion, Sun, Moon, Monitor, Maximize2, Minimize2 } from "lucide-react";
 
 // Import components
 import Navigation from "./components/Navigation";
@@ -228,6 +228,65 @@ export default function App() {
   const [filterMilestone, setFilterMilestone] = useState("");
   const [filterIssueType, setFilterIssueType] = useState("");
 
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+  const [density, setDensity] = useState(() => localStorage.getItem("density") || "comfy");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const apply = (dark) => root.classList.toggle("dark", dark);
+    if (theme === "auto") {
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      apply(media.matches);
+      const listener = (e) => apply(e.matches);
+      media.addEventListener("change", listener);
+      return () => media.removeEventListener("change", listener);
+    } else {
+      apply(theme === "dark");
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove("density-compact", "density-comfy");
+    root.classList.add(density === "compact" ? "density-compact" : "density-comfy");
+    localStorage.setItem("density", density);
+  }, [density]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        const el = document.querySelector("input[data-quick-open]");
+        el && el.focus();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setSidebarOpen((s) => !s);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        alert("Assign shortcut pressed (not implemented)");
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        alert("Label shortcut pressed (not implemented)");
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        alert("Close shortcut pressed (not implemented)");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const cycleTheme = () =>
+    setTheme((t) => (t === "light" ? "dark" : t === "dark" ? "auto" : "light"));
+  const toggleDensity = () =>
+    setDensity((d) => (d === "comfy" ? "compact" : "comfy"));
+
   const loadData = async () => {
     setLoading(true);
     setError("");
@@ -374,9 +433,15 @@ export default function App() {
               <Button className="bg-black text-white" onClick={loadData} disabled={loading || !org || !token}>
                 {loading ? (<><Loader2 className="w-4 h-4 animate-spin"/><span>Loading</span></>) : (<><RefreshCcw className="w-4 h-4"/><span>Load</span></>)}
               </Button>
+              <button onClick={cycleTheme} title={`Theme: ${theme}`} className="p-2 border rounded">
+                {theme === "dark" ? <Moon className="w-4 h-4"/> : theme === "light" ? <Sun className="w-4 h-4"/> : <Monitor className="w-4 h-4"/>}
+              </button>
+              <button onClick={toggleDensity} title={`Density: ${density}`} className="p-2 border rounded">
+                {density === "compact" ? <Minimize2 className="w-4 h-4"/> : <Maximize2 className="w-4 h-4"/>}
+              </button>
             </div>
           </div>
-          <Navigation />
+          {sidebarOpen && <Navigation />}
         </div>
       </header>
 

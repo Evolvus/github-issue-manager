@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root.density-compact {
+  font-size: 14px;
+}
+
+:root.density-comfy {
+  font-size: 16px;
+}
