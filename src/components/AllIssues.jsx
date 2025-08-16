@@ -80,10 +80,10 @@ export default function AllIssues({
   return (
     <div className="space-y-6">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
-          <Input placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-60"/>
-        </div>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
+            <Input data-quick-open placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-60"/>
+          </div>
         <select value={filterState} onChange={e=>setFilterState(e.target.value)} className="border rounded-md text-sm px-2 py-1">
           <option value="">All States</option>
           <option value="OPEN">Open</option>

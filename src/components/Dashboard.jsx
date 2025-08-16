@@ -4,21 +4,24 @@ import { Card, CardHeader, CardContent, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { ExternalLink, Search } from "lucide-react";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
+  import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+  import { ExternalLink, Search } from "lucide-react";
+  import {
+    ResponsiveContainer,
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    Tooltip,
+    Legend,
+    CartesianGrid,
+    PieChart,
+    Pie,
+    Cell,
+    BarChart,
+    Bar,
+  } from "recharts";
+  import TimeAgo from "./TimeAgo";
 
 // Helper functions
 function fmtDate(iso) {
@@ -179,7 +182,56 @@ export default function Dashboard({
     }
     return Array.from(out.values()).sort((a,b) => b.issues.length - a.issues.length);
   }, [allIssues]);
-  const topAssignees = useMemo(() => byAssignee.slice(0, 10), [byAssignee]);
+    const topAssignees = useMemo(() => byAssignee.slice(0, 10), [byAssignee]);
+
+    const agingBuckets = useMemo(() => {
+      const buckets = {
+        "<7": 0,
+        "7-30": 0,
+        "31-90": 0,
+        ">90": 0,
+      };
+      const now = new Date();
+      for (const iss of allIssues) {
+        if (iss.state !== "OPEN") continue;
+        const ageDays = (now - new Date(iss.createdAt)) / 86400000;
+        if (ageDays < 7) buckets["<7"]++;
+        else if (ageDays < 30) buckets["7-30"]++;
+        else if (ageDays < 90) buckets["31-90"]++;
+        else buckets[">90"]++;
+      }
+      return Object.entries(buckets).map(([range, value]) => ({ range, value }));
+    }, [allIssues]);
+
+    const avgCycle = useMemo(() => {
+      const closed = allIssues.filter(i => i.closedAt);
+      if (!closed.length) return 0;
+      const total = closed.reduce(
+        (sum, i) => sum + (new Date(i.closedAt) - new Date(i.createdAt)),
+        0
+      );
+      return total / closed.length / 86400000;
+    }, [allIssues]);
+
+    const assigneeThroughput = useMemo(() => {
+      const map = new Map();
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      for (const iss of allIssues) {
+        if (!iss.closedAt) continue;
+        const closedDate = new Date(iss.closedAt);
+        if (closedDate < cutoff) continue;
+        const assignees = iss.assignees.length
+          ? iss.assignees
+          : [{ login: "(unassigned)" }];
+        for (const a of assignees) {
+          map.set(a.login, (map.get(a.login) || 0) + 1);
+        }
+      }
+      return Array.from(map.entries())
+        .map(([login, count]) => ({ login, count }))
+        .sort((a, b) => b.count - a.count);
+    }, [allIssues]);
 
   const issueTypeData = useMemo(() => {
     const map = new Map();
@@ -251,12 +303,12 @@ export default function Dashboard({
             {orgMeta.name} <ExternalLink className="w-3 h-3"/>
           </a>
         )}
-        <div className="ml-auto flex items-center gap-2">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
-            <Input placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-60"/>
+          <div className="ml-auto flex items-center gap-2">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
+              <Input data-quick-open placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-60"/>
+            </div>
           </div>
-        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -369,7 +421,7 @@ export default function Dashboard({
                 <li key={iss.id} className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline truncate block">#{iss.number} {iss.title}</a>
-                    <div className="text-xs text-gray-500">{iss.repository?.nameWithOwner} • {fmtDate(iss.createdAt)}</div>
+                      <div className="text-xs text-gray-500">{iss.repository?.nameWithOwner} • <TimeAgo iso={iss.createdAt} /></div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {iss.labels.map(l => (
                         <span
@@ -417,9 +469,58 @@ export default function Dashboard({
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
 
-      <Card className="mt-6">
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Issue Aging</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={agingBuckets}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="range" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="#3b82f6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Avg Cycle Time</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{avgCycle.toFixed(1)}d</div>
+            </CardContent>
+          </Card>
+
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>Assignee Throughput (30d)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                {assigneeThroughput.map(row => (
+                  <li key={row.login} className="flex items-center justify-between">
+                    <span>{row.login}</span>
+                    <Badge variant="secondary">{row.count}</Badge>
+                  </li>
+                ))}
+                {!assigneeThroughput.length && (
+                  <div className="text-sm text-gray-500">No data.</div>
+                )}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mt-6">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Sprint Burndown Chart</CardTitle>
