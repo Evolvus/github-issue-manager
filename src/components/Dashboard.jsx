@@ -330,6 +330,49 @@ export default function Dashboard({
         </Card>
       </div>
 
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Sprint Burndown Chart</CardTitle>
+            <div className="flex gap-2">
+              <Button
+                className={burnRange === "week" ? "bg-black text-white" : "bg-white text-black border"}
+                onClick={() => setBurnRange("week")}
+              >
+                Week
+              </Button>
+              <Button
+                className={burnRange === "month" ? "bg-black text-white" : "bg-white text-black border"}
+                onClick={() => setBurnRange("month")}
+              >
+                Month
+              </Button>
+              <Button
+                className={burnRange === "year" ? "bg-black text-white" : "bg-white text-black border"}
+                onClick={() => setBurnRange("year")}
+              >
+                Year
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={burnDownSeries}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tickFormatter={formatBurnXAxis} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="open" name="Open Issues" stroke="#3b82f6" />
+                <Line type="monotone" dataKey="closed" name="Closed Issues" stroke="#ef4444" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid md:grid-cols-4 gap-4">
         <Card className="md:col-span-2">
           <CardHeader>
@@ -469,7 +512,7 @@ export default function Dashboard({
             </div>
           </CardContent>
         </Card>
-        </div>
+      </div>
 
         <div className="grid md:grid-cols-2 gap-4">
           <Card>
@@ -520,48 +563,7 @@ export default function Dashboard({
           </Card>
         </div>
 
-        <Card className="mt-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Sprint Burndown Chart</CardTitle>
-            <div className="flex gap-2">
-              <Button
-                className={burnRange === "week" ? "bg-black text-white" : "bg-white text-black border"}
-                onClick={() => setBurnRange("week")}
-              >
-                Week
-              </Button>
-              <Button
-                className={burnRange === "month" ? "bg-black text-white" : "bg-white text-black border"}
-                onClick={() => setBurnRange("month")}
-              >
-                Month
-              </Button>
-              <Button
-                className={burnRange === "year" ? "bg-black text-white" : "bg-white text-black border"}
-                onClick={() => setBurnRange("year")}
-              >
-                Year
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={burnDownSeries}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickFormatter={formatBurnXAxis} />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="open" name="Open Issues" stroke="#3b82f6" />
-                <Line type="monotone" dataKey="closed" name="Closed Issues" stroke="#ef4444" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+
     </div>
   );
 }
