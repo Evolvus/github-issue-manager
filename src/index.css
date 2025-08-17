@@ -9,3 +9,205 @@
 :root.density-comfy {
   font-size: 16px;
 }
+
+/* Dark mode styles */
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+.dark .bg-gray-50 {
+  background-color: #0f172a;
+}
+
+.dark .bg-white {
+  background-color: #1e293b;
+}
+
+.dark .bg-white\/80 {
+  background-color: rgba(30, 41, 59, 0.8);
+}
+
+.dark .text-gray-600 {
+  color: #94a3b8;
+}
+
+.dark .text-gray-500 {
+  color: #64748b;
+}
+
+.dark .text-gray-700 {
+  color: #cbd5e1;
+}
+
+.dark .border {
+  border-color: #334155;
+}
+
+.dark .border-red-200 {
+  border-color: #7f1d1d;
+}
+
+.dark .text-red-600 {
+  color: #fca5a5;
+}
+
+.dark .text-red-700 {
+  color: #fecaca;
+}
+
+.dark .text-blue-600 {
+  color: #93c5fd;
+}
+
+.dark .bg-black {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.dark .bg-white.text-black {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+.dark .bg-white.text-black.border {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+
+.dark .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.dark .backdrop-blur {
+  backdrop-filter: blur(8px);
+}
+
+/* Dark mode for cards */
+.dark .card {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+/* Dark mode for inputs */
+.dark input {
+  background-color: #334155;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+.dark input::placeholder {
+  color: #94a3b8;
+}
+
+/* Dark mode for buttons */
+.dark .bg-white.text-black.border:hover {
+  background-color: #475569;
+}
+
+/* Dark mode for badges */
+.dark .badge {
+  background-color: #334155;
+  color: #e2e8f0;
+}
+
+.dark .badge[data-variant="secondary"] {
+  background-color: #475569;
+  color: #cbd5e1;
+}
+
+/* Dark mode for avatars */
+.dark .avatar {
+  background-color: #475569;
+}
+
+/* Dark mode for tooltips and charts */
+.dark .recharts-tooltip-wrapper {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.dark .recharts-tooltip-label {
+  color: #e2e8f0;
+}
+
+.dark .recharts-tooltip-item {
+  color: #cbd5e1;
+}
+
+/* Dark mode for scrollbars */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Additional dark mode overrides for better compatibility */
+.dark .text-3xl {
+  color: #e2e8f0;
+}
+
+.dark .text-sm {
+  color: #cbd5e1;
+}
+
+.dark .text-xs {
+  color: #94a3b8;
+}
+
+.dark .font-medium {
+  color: #e2e8f0;
+}
+
+.dark .font-semibold {
+  color: #e2e8f0;
+}
+
+.dark .font-bold {
+  color: #e2e8f0;
+}
+
+/* Dark mode for links */
+.dark a {
+  color: #93c5fd;
+}
+
+.dark a:hover {
+  color: #60a5fa;
+}
+
+/* Dark mode for focus states */
+.dark *:focus {
+  outline-color: #60a5fa;
+}
+
+/* Dark mode for disabled states */
+.dark .disabled\:opacity-50 {
+  opacity: 0.5;
+}
+
+/* Dark mode for hover states */
+.dark .hover\:opacity-90:hover {
+  opacity: 0.9;
+}
+
+.dark .hover\:underline:hover {
+  text-decoration: underline;
+}

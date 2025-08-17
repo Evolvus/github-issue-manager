@@ -21,8 +21,8 @@ export default function Navigation() {
           className={({ isActive }) =>
             `flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
               isActive
-                ? "bg-black text-white"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                ? "bg-black dark:bg-white text-white dark:text-black"
+                : "text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700"
             }`
           }
         >
