@@ -7,15 +7,18 @@
     <script>
       // Prevent flash of unstyled content
       (function() {
-        const theme = localStorage.getItem('theme') || 'light';
+        const theme = localStorage.getItem('theme');
         const root = document.documentElement;
         
+        // Force light mode as default unless explicitly set to dark
         if (theme === 'dark') {
           root.classList.add('dark');
-        } else if (theme === 'auto') {
-          const media = window.matchMedia('(prefers-color-scheme: dark)');
-          if (media.matches) {
-            root.classList.add('dark');
+        } else {
+          // For any other case (including 'auto', 'light', or no theme), use light mode
+          root.classList.remove('dark');
+          // If theme is 'auto' or not set, change it to 'light'
+          if (!theme || theme === 'auto') {
+            localStorage.setItem('theme', 'light');
           }
         }
       })();

@@ -228,7 +228,16 @@ export default function App() {
   const [filterMilestone, setFilterMilestone] = useState("");
   const [filterIssueType, setFilterIssueType] = useState("");
 
-  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+  // Default theme is light mode - force reset if needed
+  const [theme, setTheme] = useState(() => {
+    const storedTheme = localStorage.getItem("theme");
+    // If no theme is stored or if it's auto (which might default to dark), use light
+    if (!storedTheme || storedTheme === "auto") {
+      localStorage.setItem("theme", "light");
+      return "light";
+    }
+    return storedTheme;
+  });
   const [density, setDensity] = useState(() => localStorage.getItem("density") || "comfy");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -286,6 +295,17 @@ export default function App() {
     setTheme((t) => (t === "light" ? "dark" : t === "dark" ? "auto" : "light"));
   const toggleDensity = () =>
     setDensity((d) => (d === "comfy" ? "compact" : "comfy"));
+
+  // Temporary function to force reset theme to light mode
+  const forceLightMode = () => {
+    localStorage.setItem("theme", "light");
+    setTheme("light");
+  };
+
+  // Expose the function globally for debugging
+  if (typeof window !== 'undefined') {
+    window.forceLightMode = forceLightMode;
+  }
 
   const loadData = async () => {
     setLoading(true);
