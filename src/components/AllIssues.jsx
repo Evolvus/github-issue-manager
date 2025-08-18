@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -53,6 +53,8 @@ export default function AllIssues({
   tagOptions,
   milestoneOptions
 }) {
+  const PAGE_SIZE = 50;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const filteredAllIssues = useMemo(() => {
     const q = query.toLowerCase();
     return allIssuesWithStatus.filter(i =>
@@ -76,6 +78,13 @@ export default function AllIssues({
       )
     );
   }, [allIssuesWithStatus, filterState, filterProjectStatus, filterAssignee, filterIssueType, filterTag, filterMilestone, query]);
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filteredAllIssues]);
+  const paginatedIssues = useMemo(
+    () => filteredAllIssues.slice(0, visibleCount),
+    [filteredAllIssues, visibleCount]
+  );
 
   return (
     <div className="space-y-6">
@@ -117,11 +126,18 @@ export default function AllIssues({
       <div className="mb-3 text-sm text-gray-500">Showing {filteredAllIssues.length} issues</div>
       
       <div className="grid md:grid-cols-2 gap-4">
-        {filteredAllIssues.map(iss => (
+        {paginatedIssues.map(iss => (
           <IssueCard key={iss.id} issue={iss} />
         ))}
-        {!filteredAllIssues.length && <Card><CardContent className="py-10"><div className="text-sm text-gray-500">No data available.</div></CardContent></Card>}
+        {!paginatedIssues.length && <Card><CardContent className="py-10"><div className="text-sm text-gray-500">No data available.</div></CardContent></Card>}
       </div>
+      {visibleCount < filteredAllIssues.length && (
+        <div className="flex justify-center">
+          <Button variant="outline" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
+            Load More
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
