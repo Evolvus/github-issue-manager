@@ -1,1 +1,0 @@
-import{j as a}from"./index-D9dTo_Rc.js";import"./react-vendor-Dku4jBrG.js";function c({iso:e}){if(!e)return null;const n=new Date(e),r=new Date-n,t=Math.floor(r/6e4);let o;return t<60?o=`${t}m ago`:t<1440?o=`${Math.floor(t/60)}h ago`:o=`${Math.floor(t/1440)}d ago`,a.jsx("time",{dateTime:e,title:n.toLocaleString(),children:o})}export{c as T};
