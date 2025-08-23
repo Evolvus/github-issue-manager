@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { Card, CardHeader, CardContent, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { FolderKanban, Download, ChevronDown } from "lucide-react";
+import { Input } from "./ui/input";
+import { FolderKanban, Download, ChevronDown, Search } from "lucide-react";
 import TimeAgo from "./TimeAgo";
 
 function issuesToCSV(issues) {
@@ -33,6 +34,7 @@ function downloadCSV(issues, filename) {
 export default function ProjectBoard({ projects }) {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [collapsedCols, setCollapsedCols] = useState({});
+  const [searchTerms, setSearchTerms] = useState({});
 
   const handleDrop = (issueId, newStatus) => {
     // This would typically update the project status via API
@@ -73,32 +75,53 @@ export default function ProjectBoard({ projects }) {
       </div>
       
       <div className="grid lg:grid-cols-5 md:grid-cols-3 sm:grid-cols-2 gap-4">
-        {projectBoardByStatus.map(([status, list]) => (
-          <Card key={status} className="rounded-2xl">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>{status}</CardTitle>
-                <div className="flex items-center gap-1">
-                  <Badge variant="secondary">{list.length}</Badge>
-                  <Download className="w-4 h-4 cursor-pointer" onClick={() => downloadCSV(list, `${status}.csv`)} />
-                  <ChevronDown onClick={() => toggleCollapse(status)} className={`w-4 h-4 cursor-pointer transition-transform ${collapsedCols[status] ? '-rotate-90' : ''}`} />
+        {projectBoardByStatus.map(([status, list]) => {
+          const search = searchTerms[status] || "";
+          const filteredList = list.filter(iss => {
+            const q = search.toLowerCase();
+            if (!q) return true;
+            return (
+              (iss.title && iss.title.toLowerCase().includes(q)) ||
+              iss.number.toString().includes(q) ||
+              (iss.assignees || []).some(a => a.login.toLowerCase().includes(q))
+            );
+          });
+          return (
+            <Card key={status} className="rounded-2xl">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{status}</CardTitle>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="secondary">{filteredList.length}</Badge>
+                    <Download className="w-4 h-4 cursor-pointer" onClick={() => downloadCSV(filteredList, `${status}.csv`)} />
+                    <ChevronDown onClick={() => toggleCollapse(status)} className={`w-4 h-4 cursor-pointer transition-transform ${collapsedCols[status] ? '-rotate-90' : ''}`} />
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            {!collapsedCols[status] && (
-            <CardContent>
-              <ul className="space-y-3 max-h-[70vh] overflow-auto pr-1" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault(); const data = JSON.parse(e.dataTransfer.getData('text/plain')); handleDrop(data.issueId, status);}}>
-                {list.map(iss => (
-                  <li key={iss.id} className="p-3 border rounded-xl bg-white shadow-sm" draggable onDragStart={e=>e.dataTransfer.setData('text/plain', JSON.stringify({ issueId: iss.id }))}>
-                    <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline block">#{iss.number} {iss.title}</a>
-                      <div className="text-xs text-gray-500">{iss.repository} • <TimeAgo iso={iss.createdAt} /></div>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-            )}
-          </Card>
-        ))}
+                <div className="relative mt-2">
+                  <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    placeholder="Search..."
+                    value={search}
+                    onChange={e => setSearchTerms(prev => ({ ...prev, [status]: e.target.value }))}
+                    className="pl-7 h-8 text-sm"
+                  />
+                </div>
+              </CardHeader>
+              {!collapsedCols[status] && (
+              <CardContent>
+                <ul className="space-y-3 max-h-[70vh] overflow-auto pr-1" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault(); const data = JSON.parse(e.dataTransfer.getData('text/plain')); handleDrop(data.issueId, status);}}>
+                  {filteredList.map(iss => (
+                    <li key={iss.id} className="p-3 border rounded-xl bg-white shadow-sm" draggable onDragStart={e=>e.dataTransfer.setData('text/plain', JSON.stringify({ issueId: iss.id }))}>
+                      <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline block">#{iss.number} {iss.title}</a>
+                        <div className="text-xs text-gray-500">{iss.repository} • <TimeAgo iso={iss.createdAt} /></div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              )}
+            </Card>
+          );
+        })}
         {!projectBoardByStatus.length && (
           <Card><CardContent className="py-10"><div className="text-sm text-gray-500">No data available.</div></CardContent></Card>
         )}
