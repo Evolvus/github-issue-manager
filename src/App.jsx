@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { Card, CardHeader, CardContent, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
-import { Loader2, Github, RefreshCcw, ShieldQuestion, Sun, Moon, Monitor, Maximize2, Minimize2 } from "lucide-react";
+import { Loader2, Github, RefreshCcw, ShieldQuestion, Sun, Moon, Monitor, Maximize2, Minimize2, ExternalLink } from "lucide-react";
 
 // Import components
 const Navigation = lazy(() => import("./components/Navigation"));
@@ -451,9 +451,10 @@ export default function App() {
               href="https://github.com/evolvus/github-issue-manager"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+              title="View Source Code"
             >
-              Source
+              <Github className="w-4 h-4" />
             </a>
             <div className="ml-auto flex items-center gap-2 w-full sm:w-auto">
               <Input placeholder="Organization (e.g. vercel)" value={org} onChange={e=>setOrg(e.target.value)} className="w-44" />
@@ -549,6 +550,7 @@ export default function App() {
             <Route path="/sprints" element={
               <Sprints 
                 allIssues={allIssues}
+                orgMeta={orgMeta}
               />
             } />
             <Route path="/all-issues" element={
