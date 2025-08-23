@@ -458,7 +458,7 @@ export default function App() {
             </a>
             <div className="ml-auto flex items-center gap-2 w-full sm:w-auto">
               <Input placeholder="Organization (e.g. vercel)" value={org} onChange={e=>setOrg(e.target.value)} className="w-44" />
-              <Input placeholder="Personal Access Token" type="password" value={token} onChange={e=>setToken(e.target.value)} className="w-64" />
+              <Input placeholder="Personal Access Token" type="password" autoComplete="off" value={token} onChange={e=>setToken(e.target.value)} className="w-64" />
               <Button className="bg-black text-white" onClick={loadData} disabled={loading || !org || !token}>
                 {loading ? (<><Loader2 className="w-4 h-4 animate-spin"/><span>Loading</span></>) : (<><RefreshCcw className="w-4 h-4"/><span>Load</span></>)}
               </Button>
