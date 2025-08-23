@@ -23,8 +23,12 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-      - run: npm ci
-      - run: npm run build
+      - name: Clear npm cache
+        run: npm cache clean --force
+      - name: Install dependencies
+        run: npm install --no-optional=false
+      - name: Build application
+        run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
