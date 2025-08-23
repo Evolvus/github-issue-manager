@@ -1,6 +1,10 @@
 # GitHub Issues Manager
 
-A modern React application for managing and visualizing GitHub issues across organizations. Built with React Router for seamless navigation and enhanced user experience.
+A modern React application for managing and visualizing GitHub issues across organizations. Built with React Router for seamless navigation and enhanced user experience. This project was built using Codex ChatGPT.
+
+## 🎥 Live Demo
+
+Try the app at [https://evolvus.github.io/github-issue-manager/](https://evolvus.github.io/github-issue-manager/).
 
 ## ✨ Features
 
@@ -163,11 +167,12 @@ VITE_GITHUB_API_URL=https://api.github.com/graphql
 
 ## 📝 License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
 - GitHub for the excellent GraphQL API
+- Codex ChatGPT for assisting in building this project
 - The React Router team for the amazing routing solution
 - The Tailwind CSS team for the utility-first approach
 - All contributors and users of this project

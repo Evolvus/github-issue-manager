@@ -447,6 +447,14 @@ export default function App() {
           <div className="flex items-center gap-3 mb-4">
             <Github className="w-6 h-6" />
             <h1 className="text-xl font-semibold">GitHub Issues Manager</h1>
+            <a
+              href="https://github.com/evolvus/github-issue-manager"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Source
+            </a>
             <div className="ml-auto flex items-center gap-2 w-full sm:w-auto">
               <Input placeholder="Organization (e.g. vercel)" value={org} onChange={e=>setOrg(e.target.value)} className="w-44" />
               <Input placeholder="Personal Access Token" type="password" value={token} onChange={e=>setToken(e.target.value)} className="w-64" />
