@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Card, CardHeader, CardContent, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
@@ -7,13 +7,13 @@ import { Input } from "./components/ui/input";
 import { Loader2, Github, RefreshCcw, ShieldQuestion, Sun, Moon, Monitor, Maximize2, Minimize2 } from "lucide-react";
 
 // Import components
-import Navigation from "./components/Navigation";
-import Dashboard from "./components/Dashboard";
-import ByAssignee from "./components/ByAssignee";
-import ByTags from "./components/ByTags";
-import ProjectBoard from "./components/ProjectBoard";
-import Sprints from "./components/Sprints";
-import AllIssues from "./components/AllIssues";
+const Navigation = lazy(() => import("./components/Navigation"));
+const Dashboard = lazy(() => import("./components/Dashboard"));
+const ByAssignee = lazy(() => import("./components/ByAssignee"));
+const ByTags = lazy(() => import("./components/ByTags"));
+const ProjectBoard = lazy(() => import("./components/ProjectBoard"));
+const Sprints = lazy(() => import("./components/Sprints"));
+const AllIssues = lazy(() => import("./components/AllIssues"));
 
 /**
  * GitHub Issues Manager (React)
@@ -469,7 +469,11 @@ export default function App() {
               </button>
             </div>
           </div>
-          {sidebarOpen && <Navigation />}
+          {sidebarOpen && (
+            <Suspense fallback={<Loader2 className="w-4 h-4 animate-spin" />}>
+              <Navigation />
+            </Suspense>
+          )}
         </div>
       </header>
 
@@ -493,6 +497,7 @@ export default function App() {
             </CardContent>
           </Card>
         ) : (
+          <Suspense fallback={<div className="py-10 text-center"><Loader2 className="w-4 h-4 animate-spin"/></div>}>
           <Routes>
             <Route path="/" element={
               <Dashboard 
@@ -572,6 +577,7 @@ export default function App() {
             } />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         )}
       </main>
     </div>
