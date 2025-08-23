@@ -23,10 +23,20 @@ function getContrastColor(hexColor) {
   return luminance > 0.5 ? '#000000' : '#ffffff';
 }
 
+const HEX_COLOR_REGEX = /^#?(?:[0-9a-fA-F]{3}){1,2}$/;
+const SAFE_COLOR = "6b7280";
+
+function normalizeHex(color) {
+  if (!color || !HEX_COLOR_REGEX.test(color)) {
+    return SAFE_COLOR;
+  }
+  let hex = color.replace(/^#/, "");
+  return hex.length === 3 ? hex.split("").map(c => c + c).join("") : hex;
+}
+
 export default function IssueCard({ issue, showMilestone = true }) {
   const otherLabels = issue.labels.filter(l => !/^type:\s*/i.test(l.name));
-  const typeColorRaw = (issue.issueType?.color || "6b7280").replace(/^#/, "");
-  const typeColor = typeColorRaw.length === 3 ? typeColorRaw.split("").map(c => c + c).join("") : typeColorRaw;
+  const typeColor = normalizeHex(issue.issueType?.color);
   
   return (
     <Card>
@@ -63,15 +73,18 @@ export default function IssueCard({ issue, showMilestone = true }) {
         )}
         {otherLabels.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
-            {otherLabels.map(l => (
-              <span
-                key={l.id}
-                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                style={{ backgroundColor: `#${l.color}`, color: getContrastColor(l.color) }}
-              >
-                {l.name}
-              </span>
-            ))}
+            {otherLabels.map(l => {
+              const labelColor = normalizeHex(l.color);
+              return (
+                <span
+                  key={l.id}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: `#${labelColor}`, color: getContrastColor(labelColor) }}
+                >
+                  {l.name}
+                </span>
+              );
+            })}
           </div>
         )}
         <div className="mt-2 flex items-center gap-1">
