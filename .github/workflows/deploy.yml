@@ -23,10 +23,14 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-      - name: Clear npm cache
-        run: npm cache clean --force
+      - name: Clear npm cache and remove lock files
+        run: |
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
       - name: Install dependencies
-        run: npm install --no-optional=false
+        run: npm install
+      - name: Install missing Rollup binary
+        run: npm install @rollup/rollup-linux-x64-gnu
       - name: Build application
         run: npm run build
       - uses: actions/upload-pages-artifact@v3
