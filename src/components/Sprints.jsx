@@ -2,8 +2,8 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardHeader, CardContent, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Download, ChevronDown } from "lucide-react";
-import IssueCard from "./IssueCard";
+import { Download, Maximize2, Minimize2 } from "lucide-react";
+import IssueCard, { ExpandedIssueCard } from "./IssueCard";
 import jsPDF from "jspdf";
 
 function fmtDate(iso) {
@@ -418,11 +418,11 @@ async function downloadReleaseNotes(sp, orgName) {
 
 export default function Sprints({ allIssues, orgMeta, projects }) {
   const statusMap = useMemo(() => {
-    const project = projects?.find(p => p.title === "Syneca Road map");
     const map = new Map();
-    if (project) {
+    // Use all projects to build the status map
+    projects?.forEach(project => {
       project.issues.forEach(i => map.set(i.id, i.project_status));
-    }
+    });
     return map;
   }, [projects]);
 
@@ -466,77 +466,184 @@ export default function Sprints({ allIssues, orgMeta, projects }) {
     });
   }, [sprints, statusMap]);
 
-  const [expanded, setExpanded] = useState({});
+  const [activeTab, setActiveTab] = useState("");
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [clickedIssue, setClickedIssue] = useState(null);
+  const [clickedIssueData, setClickedIssueData] = useState(null);
+  
   useEffect(() => {
     if (sprintData.length) {
-      setExpanded({ [sprintData[0].id]: true });
+      setActiveTab(sprintData[0].id);
     }
   }, [sprintData]);
 
-  const toggle = id => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleFullScreen = () => {
+    setIsFullScreen(!isFullScreen);
+  };
+
+  const handleIssueClick = (issue) => {
+    setClickedIssue(issue.id);
+    setClickedIssueData(issue);
+  };
+
+  const handleClosePopup = () => {
+    setClickedIssue(null);
+    setClickedIssueData(null);
+  };
+
+  if (!sprintData.length) {
+    return (
+      <Card>
+        <CardContent className="py-10">
+          <div className="text-sm text-gray-500">No data available.</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {sprintData.map(sp => (
-        <Card key={sp.id} className="rounded-2xl">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ChevronDown
-                  onClick={() => toggle(sp.id)}
-                  className={`w-4 h-4 cursor-pointer transition-transform ${expanded[sp.id] ? '' : '-rotate-90'}`}
-                />
-                <CardTitle className="truncate">
-                  <a href={sp.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                    {sp.title}
-                  </a>
-                </CardTitle>
-                <Button
-                  className="text-xs border px-2 py-1"
-                  onClick={() => downloadReleaseNotes(sp, orgMeta?.name)}
-                  title="Download Release Notes"
-                >
-                  <Download className="w-4 h-4" />
-                </Button>
-              </div>
-              <Badge variant="secondary">{sp.closed}/{sp.open + sp.closed}</Badge>
-            </div>
-            {sp.dueOn && <div className="text-xs text-gray-500 mt-1">Due {fmtDate(sp.dueOn)}</div>}
-          </CardHeader>
-          {expanded[sp.id] && (
-            <CardContent>
-              <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
-                <div
-                  className="bg-blue-500 h-2 rounded-full"
-                  style={{ width: `${((sp.closed / (sp.open + sp.closed)) * 100 || 0)}%` }}
-                />
-              </div>
-              <div className="grid lg:grid-cols-6 md:grid-cols-3 sm:grid-cols-2 gap-4">
-                {sp.grouped.map(([status, list]) => (
-                  <div key={status} className="border rounded-xl p-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">{status}</span>
-                      <Badge variant="secondary">{list.length}</Badge>
+    <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-white p-6' : ''}`}>
+      {/* Horizontal Milestone Tabs */}
+      <div className="mb-6">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Milestones</h3>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {sprintData.map(sp => (
+            <button
+              key={sp.id}
+              onClick={() => setActiveTab(sp.id)}
+              className={`flex-shrink-0 px-4 py-2 rounded-lg border transition-all duration-200 ${
+                activeTab === sp.id
+                  ? 'bg-blue-50 border-blue-200 shadow-sm text-blue-700'
+                  : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700'
+              }`}
+            >
+              <span className="text-sm font-medium whitespace-nowrap">
+                {sp.title}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content Area */}
+      <div className="w-full">
+        {sprintData.map(sp => (
+          <div key={sp.id} className={activeTab === sp.id ? 'block' : 'hidden'}>
+            {/* Enhanced Header with Milestone Details */}
+            <div className="bg-white rounded-2xl border shadow-sm mb-6">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-gray-900">
+                      <a href={sp.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        {sp.title}
+                      </a>
+                    </h1>
+                    <Button
+                      className="text-xs border px-3 py-1"
+                      onClick={() => downloadReleaseNotes(sp, orgMeta?.name)}
+                      title="Download Release Notes"
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      Release Notes
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-sm px-3 py-1">
+                      {sp.closed}/{sp.open + sp.closed} completed
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleFullScreen}
+                      className="p-2"
+                      title={isFullScreen ? "Exit Full Screen" : "Full Screen"}
+                    >
+                      {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+                  <div
+                    className="bg-blue-500 h-3 rounded-full transition-all duration-500"
+                    style={{ width: `${((sp.closed / (sp.open + sp.closed)) * 100 || 0)}%` }}
+                  />
+                </div>
+                
+                {/* Milestone Details */}
+                <div className="flex items-center gap-6 text-sm text-gray-600">
+                  {sp.dueOn && (
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">Due:</span>
+                      <span>{formatDateForHeader(sp.dueOn)}</span>
                     </div>
-                    <ul className="space-y-2 max-h-60 overflow-auto pr-1">
+                  )}
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium">Progress:</span>
+                    <span>{Math.round((sp.closed / (sp.open + sp.closed)) * 100 || 0)}%</span>
+                  </div>
+                  {sp.description && (
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">Description:</span>
+                      <span className="truncate max-w-md">{sp.description}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Enhanced Kanban Board */}
+            <div className="grid lg:grid-cols-6 md:grid-cols-3 sm:grid-cols-2 gap-6">
+              {sp.grouped.map(([status, list]) => (
+                <div key={status} className="bg-white border rounded-xl shadow-sm">
+                  <div className="p-4 border-b bg-gray-50 rounded-t-xl">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700">{status}</span>
+                      <Badge variant="secondary" className="text-xs">{list.length}</Badge>
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    <ul className={`space-y-3 overflow-auto pr-1 ${
+                      isFullScreen 
+                        ? 'max-h-[calc(100vh-200px)]' 
+                        : 'max-h-[calc(100vh-250px)]'
+                    }`}>
                       {list.map(iss => (
-                        <IssueCard key={iss.id} issue={iss} showMilestone={false} />
+                        <div 
+                          key={iss.id} 
+                          className="relative cursor-pointer"
+                          onClick={() => handleIssueClick(iss)}
+                        >
+                          <IssueCard issue={iss} showMilestone={false} />
+                        </div>
                       ))}
                     </ul>
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+            
+            {/* Floating Popup */}
+            {clickedIssue && clickedIssueData && (
+              <div 
+                className="fixed z-[9999] inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+                onClick={handleClosePopup}
+              >
+                <div 
+                  className="bg-white border rounded-lg shadow-2xl max-w-2xl max-h-[80vh] overflow-y-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExpandedIssueCard issue={clickedIssueData} />
+                </div>
               </div>
-            </CardContent>
-          )}
-        </Card>
-      ))}
-      {!sprintData.length && (
-        <Card>
-          <CardContent className="py-10">
-            <div className="text-sm text-gray-500">No data available.</div>
-          </CardContent>
-        </Card>
-      )}
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

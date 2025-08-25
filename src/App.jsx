@@ -70,6 +70,7 @@ const ORG_REPOS_ISSUES = `
               id
               number
               title
+              body
               url
               state
               createdAt
@@ -332,6 +333,7 @@ export default function App() {
             id: i.id,
             number: i.number,
             title: i.title,
+            body: i.body,
             url: i.url,
             state: i.state,
             createdAt: i.createdAt,
