@@ -33,7 +33,7 @@ export default function IssueCard({ issue, showMilestone = true }) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="truncate">
-            <a href={issue.url} target="_blank" rel="noreferrer" className="hover:underline">
+            <a href={issue.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
               #{issue.number} {issue.title}
             </a>
           </CardTitle>

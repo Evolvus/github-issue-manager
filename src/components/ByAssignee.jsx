@@ -85,7 +85,7 @@ export default function ByAssignee({
                           <AvatarImage src={row.assignee.avatarUrl} />
                           <AvatarFallback>{initials(row.assignee.login)}</AvatarFallback>
                         </Avatar>
-                        <a href={row.assignee.url} target="_blank" rel="noreferrer" className="hover:underline">
+                        <a href={row.assignee.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
                           {row.assignee.login}
                         </a>
                       </div>
