@@ -299,7 +299,7 @@ export default function Dashboard({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         {orgMeta && (
-          <a href={orgMeta.url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 inline-flex items-center gap-1">
+          <a href={orgMeta.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 inline-flex items-center gap-1">
             {orgMeta.name} <ExternalLink className="w-3 h-3"/>
           </a>
         )}
@@ -463,7 +463,7 @@ export default function Dashboard({
               {latest5.map(iss => (
                 <li key={iss.id} className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline truncate block">#{iss.number} {iss.title}</a>
+                    <a href={iss.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline truncate block">#{iss.number} {iss.title}</a>
                       <div className="text-xs text-gray-500">{iss.repository?.nameWithOwner} • <TimeAgo iso={iss.createdAt} /></div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {iss.labels.map(l => (
@@ -501,7 +501,7 @@ export default function Dashboard({
                       <AvatarImage src={row.assignee.avatarUrl} />
                       <AvatarFallback>{initials(row.assignee.login)}</AvatarFallback>
                     </Avatar>
-                    <a href={row.assignee.url} target="_blank" rel="noreferrer" className="text-sm hover:underline">
+                    <a href={row.assignee.url} target="_blank" rel="noopener noreferrer" className="text-sm hover:underline">
                       {row.assignee.login}
                     </a>
                   </div>

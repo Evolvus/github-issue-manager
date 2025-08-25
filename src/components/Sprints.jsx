@@ -450,7 +450,7 @@ export default function Sprints({ allIssues, orgMeta }) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CardTitle className="truncate">
-                    <a href={sp.url} target="_blank" rel="noreferrer" className="hover:underline">
+                    <a href={sp.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
                       {sp.title}
                     </a>
                   </CardTitle>

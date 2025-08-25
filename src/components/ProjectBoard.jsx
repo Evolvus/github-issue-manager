@@ -112,7 +112,7 @@ export default function ProjectBoard({ projects }) {
                 <ul className="space-y-3 max-h-[70vh] overflow-auto pr-1" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault(); const data = JSON.parse(e.dataTransfer.getData('text/plain')); handleDrop(data.issueId, status);}}>
                   {filteredList.map(iss => (
                     <li key={iss.id} className="p-3 border rounded-xl bg-white shadow-sm" draggable onDragStart={e=>e.dataTransfer.setData('text/plain', JSON.stringify({ issueId: iss.id }))}>
-                      <a href={iss.url} target="_blank" rel="noreferrer" className="font-medium hover:underline block">#{iss.number} {iss.title}</a>
+                      <a href={iss.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline block">#{iss.number} {iss.title}</a>
                         <div className="text-xs text-gray-500">{iss.repository} • <TimeAgo iso={iss.createdAt} /></div>
                     </li>
                   ))}
