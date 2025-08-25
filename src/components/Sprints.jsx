@@ -6,6 +6,49 @@ import { Download, Maximize2, Minimize2 } from "lucide-react";
 import IssueCard, { ExpandedIssueCard } from "./IssueCard";
 import jsPDF from "jspdf";
 
+async function githubGraphQL(token, query, variables = {}) {
+  const res = await fetch("https://api.github.com/graphql", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.errors) {
+    const msg = data.errors?.map(e => e.message).join("; ") || res.statusText;
+    throw new Error(msg);
+  }
+  return data.data;
+}
+
+const ADD_TO_PROJECT = `
+  mutation($projectId: ID!, $issueId: ID!) {
+    addProjectV2ItemById(input: { projectId: $projectId, contentId: $issueId }) {
+      item { id }
+    }
+  }
+`;
+
+const UPDATE_STATUS = `
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(
+      input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: { singleSelectOptionId: $optionId } }
+    ) {
+      projectV2Item { id }
+    }
+  }
+`;
+
+const REMOVE_FROM_PROJECT = `
+  mutation($projectId: ID!, $itemId: ID!) {
+    deleteProjectV2Item(input: { projectId: $projectId, itemId: $itemId }) {
+      deletedItemId
+    }
+  }
+`;
+
 function fmtDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString("en-GB");
@@ -416,14 +459,17 @@ async function downloadReleaseNotes(sp, orgName) {
   doc.save(`${sp.title}-release-notes.pdf`);
 }
 
-export default function Sprints({ allIssues, orgMeta, projects }) {
-  const statusMap = useMemo(() => {
+export default function Sprints({ allIssues, orgMeta, projects, token }) {
+  const [statusMap, setStatusMap] = useState(new Map());
+
+  useEffect(() => {
     const map = new Map();
-    // Use all projects to build the status map
     projects?.forEach(project => {
-      project.issues.forEach(i => map.set(i.id, i.project_status));
+      project.issues.forEach(i => {
+        map.set(i.id, { status: i.project_status, itemId: i.project_item_id });
+      });
     });
-    return map;
+    setStatusMap(map);
   }, [projects]);
 
   const sprints = useMemo(() => {
@@ -457,8 +503,10 @@ export default function Sprints({ allIssues, orgMeta, projects }) {
     return sprints.map(sp => {
       const colMap = new Map(order.map(s => [s, []]));
       sp.issues.forEach(iss => {
-        const status = statusMap.get(iss.id);
-        const issue = { ...iss, project_status: status || null };
+        const entry = statusMap.get(iss.id);
+        const status = entry?.status;
+        const itemId = entry?.itemId;
+        const issue = { ...iss, project_status: status || null, project_item_id: itemId || null };
         const key = status && order.includes(status) ? status : "Not in backlog";
         colMap.get(key).push(issue);
       });
@@ -470,6 +518,11 @@ export default function Sprints({ allIssues, orgMeta, projects }) {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [clickedIssue, setClickedIssue] = useState(null);
   const [clickedIssueData, setClickedIssueData] = useState(null);
+
+  const project = projects?.[0];
+  const projectId = project?.id;
+  const statusFieldId = project?.statusFieldId;
+  const statusOptions = project?.statusOptions || {};
   
   useEffect(() => {
     if (sprintData.length) {
@@ -489,6 +542,37 @@ export default function Sprints({ allIssues, orgMeta, projects }) {
   const handleClosePopup = () => {
     setClickedIssue(null);
     setClickedIssueData(null);
+  };
+
+  const handleDrop = async (issueId, newStatus) => {
+    if (!token || !projectId) return;
+    const current = statusMap.get(issueId);
+    const currentItemId = current?.itemId;
+    try {
+      if (newStatus === "Not in backlog") {
+        if (currentItemId) {
+          await githubGraphQL(token, REMOVE_FROM_PROJECT, { projectId, itemId: currentItemId });
+          const map = new Map(statusMap);
+          map.delete(issueId);
+          setStatusMap(map);
+        }
+      } else {
+        let itemId = currentItemId;
+        if (!itemId) {
+          const res = await githubGraphQL(token, ADD_TO_PROJECT, { projectId, issueId });
+          itemId = res.addProjectV2ItemById.item.id;
+        }
+        const optionId = statusOptions[newStatus];
+        if (itemId && optionId && statusFieldId) {
+          await githubGraphQL(token, UPDATE_STATUS, { projectId, itemId, fieldId: statusFieldId, optionId });
+          const map = new Map(statusMap);
+          map.set(issueId, { status: newStatus, itemId });
+          setStatusMap(map);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to move issue", e);
+    }
   };
 
   if (!sprintData.length) {
@@ -607,15 +691,30 @@ export default function Sprints({ allIssues, orgMeta, projects }) {
                     </div>
                   </div>
                   <div className="p-2">
-                    <ul className={`space-y-3 overflow-auto pr-1 ${
-                      isFullScreen 
-                        ? 'max-h-[calc(100vh-200px)]' 
-                        : 'max-h-[calc(100vh-250px)]'
-                    }`}>
+                    <ul
+                      className={`space-y-3 overflow-auto pr-1 ${
+                        isFullScreen
+                          ? 'max-h-[calc(100vh-200px)]'
+                          : 'max-h-[calc(100vh-250px)]'
+                      }`}
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={e => {
+                        e.preventDefault();
+                        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                        handleDrop(data.issueId, status);
+                      }}
+                    >
                       {list.map(iss => (
-                        <div 
-                          key={iss.id} 
+                        <div
+                          key={iss.id}
                           className="relative cursor-pointer"
+                          draggable
+                          onDragStart={e =>
+                            e.dataTransfer.setData(
+                              'text/plain',
+                              JSON.stringify({ issueId: iss.id })
+                            )
+                          }
                           onClick={() => handleIssueClick(iss)}
                         >
                           <IssueCard issue={iss} showMilestone={false} />

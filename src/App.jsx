@@ -121,6 +121,7 @@ const PROJECT_ITEMS = `
                 issueType { id name color }
               }
             }
+            id
             fieldValues(first: 20) {
               nodes {
                 __typename
@@ -135,6 +136,18 @@ const PROJECT_ITEMS = `
             }
           }
           pageInfo { hasNextPage endCursor }
+        }
+        fields(first: 20) {
+          nodes {
+            ... on ProjectV2SingleSelectField {
+              id
+              name
+              options {
+                id
+                name
+              }
+            }
+          }
         }
       }
     }
@@ -156,9 +169,19 @@ async function fetchProjectsWithStatus(token, org) {
   for (const proj of projects) {
     let items = [];
     let after = null;
+    let statusFieldId = null;
+    let statusOptions = {};
     while (true) {
       const data = await githubGraphQL(token, PROJECT_ITEMS, { pid: proj.id, after });
       const node = data.node;
+      if (!statusFieldId) {
+        const fields = node?.fields?.nodes || [];
+        const statusField = fields.find(f => (f.name || '').toLowerCase() === 'status');
+        if (statusField) {
+          statusFieldId = statusField.id;
+          statusOptions = Object.fromEntries((statusField.options || []).map(o => [o.name, o.id]));
+        }
+      }
       const nodes = node?.items?.nodes || [];
       const rows = nodes
         .map((item) => {
@@ -181,6 +204,7 @@ async function fetchProjectsWithStatus(token, org) {
             repository: issue.repository?.nameWithOwner || "",
             project_status: status,
             issueType: issue.issueType || null,
+            project_item_id: item.id,
           };
         })
         .filter(Boolean);
@@ -188,7 +212,7 @@ async function fetchProjectsWithStatus(token, org) {
       if (!node?.items?.pageInfo?.hasNextPage) break;
       after = node.items.pageInfo.endCursor;
     }
-    out.push({ id: proj.id, number: proj.number, title: proj.title, url: proj.url, issues: items });
+    out.push({ id: proj.id, number: proj.number, title: proj.title, url: proj.url, issues: items, statusFieldId, statusOptions });
   }
   return out;
 }
@@ -554,6 +578,7 @@ export default function App() {
                 allIssues={allIssues}
                 orgMeta={orgMeta}
                 projects={projects}
+                token={token}
               />
             } />
             <Route path="/all-issues" element={
