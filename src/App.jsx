@@ -193,7 +193,7 @@ async function fetchProjectsWithStatus(token, org) {
 }
 
 async function fetchIssueTypes(token, org) {
-  const res = await fetch(`https://api.github.com/orgs/${org}/issue-types`, {
+  const res = await fetch(`https://api.github.com/orgs/${encodeURIComponent(org)}/issue-types`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
