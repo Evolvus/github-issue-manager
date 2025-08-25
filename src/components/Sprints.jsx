@@ -1,8 +1,8 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardHeader, CardContent, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Download } from "lucide-react";
+import { Download, ChevronDown } from "lucide-react";
 import IssueCard from "./IssueCard";
 import jsPDF from "jspdf";
 
@@ -416,7 +416,16 @@ async function downloadReleaseNotes(sp, orgName) {
   doc.save(`${sp.title}-release-notes.pdf`);
 }
 
-export default function Sprints({ allIssues, orgMeta }) {
+export default function Sprints({ allIssues, orgMeta, projects }) {
+  const statusMap = useMemo(() => {
+    const project = projects?.find(p => p.title === "Syneca Road map");
+    const map = new Map();
+    if (project) {
+      project.issues.forEach(i => map.set(i.id, i.project_status));
+    }
+    return map;
+  }, [projects]);
+
   const sprints = useMemo(() => {
     const map = {};
     for (const iss of allIssues) {
@@ -434,38 +443,67 @@ export default function Sprints({ allIssues, orgMeta }) {
       }
       map[m.id].issues.push(iss);
     }
-    return Object.values(map).map(m => ({
+    const arr = Object.values(map).map(m => ({
       ...m,
       open: m.issues.filter(i => i.state === "OPEN").length,
       closed: m.issues.filter(i => i.state === "CLOSED").length,
     }));
+    arr.sort((a, b) => new Date(b.dueOn || 0) - new Date(a.dueOn || 0));
+    return arr;
   }, [allIssues]);
+
+  const sprintData = useMemo(() => {
+    const order = ["Not in backlog", "Backlog", "Ready", "In progress", "In review", "Done"];
+    return sprints.map(sp => {
+      const colMap = new Map(order.map(s => [s, []]));
+      sp.issues.forEach(iss => {
+        const status = statusMap.get(iss.id);
+        const issue = { ...iss, project_status: status || null };
+        const key = status && order.includes(status) ? status : "Not in backlog";
+        colMap.get(key).push(issue);
+      });
+      return { ...sp, grouped: order.map(s => [s, colMap.get(s)]) };
+    });
+  }, [sprints, statusMap]);
+
+  const [expanded, setExpanded] = useState({});
+  useEffect(() => {
+    if (sprintData.length) {
+      setExpanded({ [sprintData[0].id]: true });
+    }
+  }, [sprintData]);
+
+  const toggle = id => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-4">
-        {sprints.map(sp => (
-          <Card key={sp.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CardTitle className="truncate">
-                    <a href={sp.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                      {sp.title}
-                    </a>
-                  </CardTitle>
-                  <Button
-                    className="text-xs border px-2 py-1"
-                    onClick={() => downloadReleaseNotes(sp, orgMeta?.name)}
-                    title="Download Release Notes"
-                  >
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </div>
-                <Badge variant="secondary">{sp.closed}/{sp.open + sp.closed}</Badge>
+      {sprintData.map(sp => (
+        <Card key={sp.id} className="rounded-2xl">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ChevronDown
+                  onClick={() => toggle(sp.id)}
+                  className={`w-4 h-4 cursor-pointer transition-transform ${expanded[sp.id] ? '' : '-rotate-90'}`}
+                />
+                <CardTitle className="truncate">
+                  <a href={sp.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                    {sp.title}
+                  </a>
+                </CardTitle>
+                <Button
+                  className="text-xs border px-2 py-1"
+                  onClick={() => downloadReleaseNotes(sp, orgMeta?.name)}
+                  title="Download Release Notes"
+                >
+                  <Download className="w-4 h-4" />
+                </Button>
               </div>
-              {sp.dueOn && <div className="text-xs text-gray-500 mt-1">Due {fmtDate(sp.dueOn)}</div>}
-            </CardHeader>
+              <Badge variant="secondary">{sp.closed}/{sp.open + sp.closed}</Badge>
+            </div>
+            {sp.dueOn && <div className="text-xs text-gray-500 mt-1">Due {fmtDate(sp.dueOn)}</div>}
+          </CardHeader>
+          {expanded[sp.id] && (
             <CardContent>
               <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
                 <div
@@ -473,22 +511,32 @@ export default function Sprints({ allIssues, orgMeta }) {
                   style={{ width: `${((sp.closed / (sp.open + sp.closed)) * 100 || 0)}%` }}
                 />
               </div>
-              <div className="space-y-2 max-h-60 overflow-auto pr-1">
-                {sp.issues.map(iss => (
-                  <IssueCard key={iss.id} issue={iss} showMilestone={false} />
+              <div className="grid lg:grid-cols-6 md:grid-cols-3 sm:grid-cols-2 gap-4">
+                {sp.grouped.map(([status, list]) => (
+                  <div key={status} className="border rounded-xl p-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">{status}</span>
+                      <Badge variant="secondary">{list.length}</Badge>
+                    </div>
+                    <ul className="space-y-2 max-h-60 overflow-auto pr-1">
+                      {list.map(iss => (
+                        <IssueCard key={iss.id} issue={iss} showMilestone={false} />
+                      ))}
+                    </ul>
+                  </div>
                 ))}
               </div>
             </CardContent>
-          </Card>
-        ))}
-        {!sprints.length && (
-          <Card>
-            <CardContent className="py-10">
-              <div className="text-sm text-gray-500">No data available.</div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          )}
+        </Card>
+      ))}
+      {!sprintData.length && (
+        <Card>
+          <CardContent className="py-10">
+            <div className="text-sm text-gray-500">No data available.</div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

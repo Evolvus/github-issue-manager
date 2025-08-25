@@ -548,9 +548,10 @@ export default function App() {
               />
             } />
             <Route path="/sprints" element={
-              <Sprints 
+              <Sprints
                 allIssues={allIssues}
                 orgMeta={orgMeta}
+                projects={projects}
               />
             } />
             <Route path="/all-issues" element={
