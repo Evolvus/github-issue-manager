@@ -70,12 +70,14 @@ function splitIssues(issues) {
   };
 
   // Debug: Log categorization results
-  console.log('Issue Categorization Debug:');
-  issues.forEach(issue => {
-    const feature = isFeature(issue);
-    const bug = isBug(issue);
-    console.log(`#${issue.number}: "${issue.title}" - Feature: ${feature}, Bug: ${bug}, Labels: [${issue.labels.map(l => l.name).join(', ')}]`);
-  });
+  if (import.meta.env.DEV) {
+    console.log('Issue Categorization Debug:');
+    issues.forEach(issue => {
+      const feature = isFeature(issue);
+      const bug = isBug(issue);
+      console.log(`#${issue.number}: "${issue.title}" - Feature: ${feature}, Bug: ${bug}, Labels: [${issue.labels.map(l => l.name).join(', ')}]`);
+    });
+  }
 
   return {
     features: issues.filter(isFeature),
