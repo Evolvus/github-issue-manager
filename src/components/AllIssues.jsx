@@ -3,7 +3,7 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Download, Search } from "lucide-react";
-import IssueCard from "./IssueCard";
+import IssueCard, { ExpandedIssueCard } from "./IssueCard";
 
 function issuesToCSV(issues) {
   const headers = ["Number", "Title", "URL", "State", "Repository", "ProjectStatus", "CreatedAt", "ClosedAt"];
@@ -55,6 +55,8 @@ export default function AllIssues({
 }) {
   const PAGE_SIZE = 50;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [clickedIssue, setClickedIssue] = useState(null);
+  const [clickedIssueData, setClickedIssueData] = useState(null);
   const filteredAllIssues = useMemo(() => {
     const q = query.toLowerCase();
     return allIssuesWithStatus.filter(i =>
@@ -81,10 +83,21 @@ export default function AllIssues({
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [filteredAllIssues]);
+  
   const paginatedIssues = useMemo(
     () => filteredAllIssues.slice(0, visibleCount),
     [filteredAllIssues, visibleCount]
   );
+
+  const handleIssueClick = (issue) => {
+    setClickedIssue(issue.id);
+    setClickedIssueData(issue);
+  };
+
+  const handleClosePopup = () => {
+    setClickedIssue(null);
+    setClickedIssueData(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -127,10 +140,31 @@ export default function AllIssues({
       
       <div className="grid md:grid-cols-2 gap-4">
         {paginatedIssues.map(iss => (
-          <IssueCard key={iss.id} issue={iss} />
+          <div 
+            key={iss.id} 
+            className="cursor-pointer"
+            onClick={() => handleIssueClick(iss)}
+          >
+            <IssueCard issue={iss} />
+          </div>
         ))}
         {!paginatedIssues.length && <Card><CardContent className="py-10"><div className="text-sm text-gray-500">No data available.</div></CardContent></Card>}
       </div>
+      
+      {/* Floating Popup */}
+      {clickedIssue && clickedIssueData && (
+        <div 
+          className="fixed z-[9999] inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+          onClick={handleClosePopup}
+        >
+          <div 
+            className="bg-white border rounded-lg shadow-2xl max-w-2xl max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ExpandedIssueCard issue={clickedIssueData} />
+          </div>
+        </div>
+      )}
       {visibleCount < filteredAllIssues.length && (
         <div className="flex justify-center">
           <Button variant="outline" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
