@@ -3,6 +3,7 @@ import { Card, CardHeader, CardContent, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import ReactMarkdown from "react-markdown";
+import TimeAgo from "./TimeAgo";
 
 function initials(str = "?") {
   const parts = str.split(/\s+|\//g).filter(Boolean);
@@ -207,7 +208,9 @@ export default function IssueCard({ issue, showMilestone = true }) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-xs text-gray-500 mb-1">{issue.repository?.nameWithOwner}</div>
+        <div className="text-xs text-gray-500 mb-1">
+          {issue.repository?.nameWithOwner} • <TimeAgo iso={issue.createdAt} />
+        </div>
         {showMilestone && issue.milestone && (
           <div className="text-xs text-gray-500 mb-1">Milestone: {issue.milestone.title}</div>
         )}
