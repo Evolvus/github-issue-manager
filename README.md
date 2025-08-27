@@ -16,7 +16,7 @@ Try the app at [https://evolvus.github.io/github-issue-manager/](https://evolvus
 
 ### 📊 **Dashboard Analytics**
 - **Real-time Charts**: Opened vs Closed issues over time (week/month/year)
-- **Sprint Burndown Chart**: Track open and closed issues over time for sprint planning
+- **Sprint Burndown Chart**: Track remaining issues against an ideal burndown trajectory for sprint planning
 - **Key Metrics**: Open, Closed, Backlog, and Sprint issues at a glance
 - **Top Contributors**: See who's most active and who closes the most issues
 

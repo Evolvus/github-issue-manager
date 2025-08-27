@@ -110,9 +110,10 @@ export default function Dashboard({
   }, [allIssues, range]);
 
   const burnDownSeries = useMemo(() => {
+    let data;
     if (burnRange === "year") {
       const months = monthsRange(12);
-      return months.map(m => {
+      data = months.map(m => {
         const start = new Date(m + "-01");
         const end = new Date(start);
         end.setMonth(end.getMonth() + 1);
@@ -121,16 +122,11 @@ export default function Dashboard({
           const closed = i.closedAt ? new Date(i.closedAt) : null;
           return created < end && (!closed || closed >= end);
         }).length;
-        const closed = allIssues.filter(i => {
-          const created = new Date(i.createdAt);
-          const closed = i.closedAt ? new Date(i.closedAt) : null;
-          return created < end && closed && closed < end;
-        }).length;
-        return { date: m, open, closed };
+        return { date: m, open };
       });
     } else {
       const days = burnRange === "week" ? daysRange(7) : daysRange(30);
-      return days.map(d => {
+      data = days.map(d => {
         const end = new Date(d);
         end.setDate(end.getDate() + 1);
         const open = allIssues.filter(i => {
@@ -138,14 +134,16 @@ export default function Dashboard({
           const closed = i.closedAt ? new Date(i.closedAt) : null;
           return created < end && (!closed || closed >= end);
         }).length;
-        const closed = allIssues.filter(i => {
-          const created = new Date(i.createdAt);
-          const closed = i.closedAt ? new Date(i.closedAt) : null;
-          return created < end && closed && closed < end;
-        }).length;
-        return { date: d, open, closed };
+        return { date: d, open };
       });
     }
+
+    const startOpen = data[0]?.open || 0;
+    const total = data.length - 1 || 1;
+    return data.map((row, idx) => ({
+      ...row,
+      ideal: Math.max(0, Math.round(startOpen - (startOpen * idx) / total)),
+    }));
   }, [allIssues, burnRange]);
 
   const formatXAxis = (d) => {
@@ -365,8 +363,8 @@ export default function Dashboard({
                 <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="open" name="Open Issues" stroke="#3b82f6" />
-                <Line type="monotone" dataKey="closed" name="Closed Issues" stroke="#ef4444" />
+                <Line type="monotone" dataKey="open" name="Remaining Issues" stroke="#3b82f6" />
+                <Line type="monotone" dataKey="ideal" name="Ideal" stroke="#a3a3a3" strokeDasharray="5 5" />
               </LineChart>
             </ResponsiveContainer>
           </div>
