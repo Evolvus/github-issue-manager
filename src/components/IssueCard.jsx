@@ -36,10 +36,23 @@ function normalizeHex(color) {
   return hex.length === 3 ? hex.split("").map(c => c + c).join("") : hex;
 }
 
+function convertImgTagsToMarkdown(text = "") {
+  return text.replace(/<img\s+[^>]*>/gi, tag => {
+    const srcMatch = tag.match(/src=["']([^"']+)["']/i);
+    const altMatch = tag.match(/alt=["']([^"']*)["']/i);
+    const src = srcMatch ? srcMatch[1] : "";
+    const alt = altMatch ? altMatch[1] : "";
+    return src ? `![${alt}](${src})` : "";
+  });
+}
+
 // Expanded Issue Card for Tooltip
 export function ExpandedIssueCard({ issue }) {
   const otherLabels = issue.labels.filter(l => !/^type:\s*/i.test(l.name));
   const typeColor = normalizeHex(issue.issueType?.color);
+  const processedBody = convertImgTagsToMarkdown(issue.body || "");
+  const displayBody =
+    processedBody.length > 500 ? `${processedBody.substring(0, 500)}...` : processedBody;
   
   return (
     <div className="bg-white border rounded-lg shadow-xl p-5 max-w-md">
@@ -157,7 +170,7 @@ export function ExpandedIssueCard({ issue }) {
       </div>
       
       {/* Issue Description/Text */}
-      {issue.body && (
+      {processedBody && (
         <div className="border-t pt-3">
           <div className="text-sm text-gray-500 font-medium mb-2">Description:</div>
           <div className="text-sm text-gray-700 leading-relaxed max-h-32 overflow-y-auto prose prose-sm max-w-none">
@@ -179,10 +192,7 @@ export function ExpandedIssueCard({ issue }) {
                 em: ({ children }) => <em className="italic">{children}</em>,
               }}
             >
-              {issue.body.length > 500 
-                ? `${issue.body.substring(0, 500)}...` 
-                : issue.body
-              }
+              {displayBody}
             </ReactMarkdown>
           </div>
         </div>
