@@ -109,6 +109,23 @@ export default function Dashboard({
     }
   }, [allIssues, range]);
 
+  // Determine issues for the currently active milestone (latest by due date)
+  const activeMilestoneIssues = useMemo(() => {
+    const map = {};
+    for (const iss of allIssues) {
+      if (!iss.milestone) continue;
+      const m = iss.milestone;
+      if (!map[m.id]) {
+        map[m.id] = { milestone: m, issues: [] };
+      }
+      map[m.id].issues.push(iss);
+    }
+    const arr = Object.values(map);
+    if (!arr.length) return [];
+    arr.sort((a, b) => new Date(b.milestone.dueOn || 0) - new Date(a.milestone.dueOn || 0));
+    return arr[0].issues;
+  }, [allIssues]);
+
   const burnDownSeries = useMemo(() => {
     let data;
     if (burnRange === "year") {
@@ -117,7 +134,7 @@ export default function Dashboard({
         const start = new Date(m + "-01");
         const end = new Date(start);
         end.setMonth(end.getMonth() + 1);
-        const open = allIssues.filter(i => {
+        const open = activeMilestoneIssues.filter(i => {
           const created = new Date(i.createdAt);
           const closed = i.closedAt ? new Date(i.closedAt) : null;
           return created < end && (!closed || closed >= end);
@@ -129,7 +146,7 @@ export default function Dashboard({
       data = days.map(d => {
         const end = new Date(d);
         end.setDate(end.getDate() + 1);
-        const open = allIssues.filter(i => {
+        const open = activeMilestoneIssues.filter(i => {
           const created = new Date(i.createdAt);
           const closed = i.closedAt ? new Date(i.closedAt) : null;
           return created < end && (!closed || closed >= end);
@@ -144,7 +161,7 @@ export default function Dashboard({
       ...row,
       ideal: Math.max(0, Math.round(startOpen - (startOpen * idx) / total)),
     }));
-  }, [allIssues, burnRange]);
+  }, [activeMilestoneIssues, burnRange]);
 
   const formatXAxis = (d) => {
     if (range === "year") {
