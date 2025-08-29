@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Search } from "lucide-react";
+import useAppStore from "../store";
 
 function getContrastColor(hex = "808080") {
   const r = parseInt(hex.substr(0, 2), 16);
@@ -16,14 +17,16 @@ function getContrastColor(hex = "808080") {
 
 export default function ByTags({
   allIssues,
-  query,
-  setQuery,
-  setFilterAssignee,
-  setFilterState,
-  setFilterProjectStatus,
-  setFilterTag,
-  setFilterIssueType,
 }) {
+  const {
+    query,
+    setQuery,
+    setFilterAssignee,
+    setFilterState,
+    setFilterProjectStatus,
+    setFilterTag,
+    setFilterIssueType,
+  } = useAppStore();
   const byLabel = useMemo(() => {
     const out = new Map();
     for (const iss of allIssues) {

@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Input } from "./ui/input";
 import { Search } from "lucide-react";
+import useAppStore from "../store";
 
 function initials(str = "?") {
   const parts = str.split(/\s+|\//g).filter(Boolean);
@@ -15,14 +16,16 @@ function initials(str = "?") {
 
 export default function ByAssignee({
   allIssues,
-  query,
-  setQuery,
-  setFilterAssignee,
-  setFilterState,
-  setFilterProjectStatus,
-  setFilterTag,
-  setFilterIssueType,
 }) {
+  const {
+    query,
+    setQuery,
+    setFilterAssignee,
+    setFilterState,
+    setFilterProjectStatus,
+    setFilterTag,
+    setFilterIssueType,
+  } = useAppStore();
   const byAssignee = useMemo(() => {
     const out = new Map();
     for (const iss of allIssues) {

@@ -6,6 +6,7 @@ import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Loader2, Github, RefreshCcw, ShieldQuestion, Sun, Moon, Monitor, Maximize2, Minimize2, ExternalLink } from "lucide-react";
 import { githubGraphQL, ORG_REPOS_ISSUES, fetchProjectsWithStatus, fetchIssueTypes } from "./api/github";
+import useAppStore from "./store";
 
 // Import components
 const Navigation = lazy(() => import("./components/Navigation"));
@@ -43,31 +44,32 @@ export default function App() {
   const [projects, setProjects] = useState([]);
   const [issueTypes, setIssueTypes] = useState([]);
 
-  // Chart state
-  const [range, setRange] = useState("month"); // week | month | year
-  const [burnRange, setBurnRange] = useState("month"); // for burn chart
-
-  // Search and filters
-  const [query, setQuery] = useState("");
-  const [filterState, setFilterState] = useState("");
-  const [filterProjectStatus, setFilterProjectStatus] = useState("");
-  const [filterAssignee, setFilterAssignee] = useState("");
-  const [filterTag, setFilterTag] = useState("");
-  const [filterMilestone, setFilterMilestone] = useState("");
-  const [filterIssueType, setFilterIssueType] = useState("");
-
-  // Default theme is light mode - force reset if needed
-  const [theme, setTheme] = useState(() => {
-    const storedTheme = localStorage.getItem("theme");
-    // If no theme is stored or if it's auto (which might default to dark), use light
-    if (!storedTheme || storedTheme === "auto") {
-      localStorage.setItem("theme", "light");
-      return "light";
-    }
-    return storedTheme;
-  });
-  const [density, setDensity] = useState(() => localStorage.getItem("density") || "comfy");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const {
+    query,
+    setQuery,
+    filterState,
+    setFilterState,
+    filterProjectStatus,
+    setFilterProjectStatus,
+    filterAssignee,
+    setFilterAssignee,
+    filterTag,
+    setFilterTag,
+    filterMilestone,
+    setFilterMilestone,
+    filterIssueType,
+    setFilterIssueType,
+    range,
+    setRange,
+    burnRange,
+    setBurnRange,
+    theme,
+    setTheme,
+    density,
+    setDensity,
+    sidebarOpen,
+    setSidebarOpen,
+  } = useAppStore();
 
   useEffect(() => {
     const root = document.documentElement;
@@ -81,14 +83,12 @@ export default function App() {
     } else {
       apply(theme === "dark");
     }
-    localStorage.setItem("theme", theme);
   }, [theme]);
 
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove("density-compact", "density-comfy");
     root.classList.add(density === "compact" ? "density-compact" : "density-comfy");
-    localStorage.setItem("density", density);
   }, [density]);
 
   useEffect(() => {
@@ -100,7 +100,7 @@ export default function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
         e.preventDefault();
-        setSidebarOpen((s) => !s);
+        setSidebarOpen(!sidebarOpen);
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "a") {
         e.preventDefault();
@@ -117,16 +117,15 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [sidebarOpen, setSidebarOpen]);
 
   const cycleTheme = () =>
-    setTheme((t) => (t === "light" ? "dark" : t === "dark" ? "auto" : "light"));
+    setTheme(theme === "light" ? "dark" : theme === "dark" ? "auto" : "light");
   const toggleDensity = () =>
-    setDensity((d) => (d === "comfy" ? "compact" : "comfy"));
+    setDensity(density === "comfy" ? "compact" : "comfy");
 
   // Temporary function to force reset theme to light mode
   const forceLightMode = () => {
-    localStorage.setItem("theme", "light");
     setTheme("light");
   };
 
@@ -330,45 +329,20 @@ export default function App() {
           <Suspense fallback={<div className="py-10 text-center"><Loader2 className="w-4 h-4 animate-spin"/></div>}>
           <Routes>
             <Route path="/" element={
-              <Dashboard 
+              <Dashboard
                 allIssues={allIssues}
                 allIssuesWithStatus={allIssuesWithStatus}
                 orgMeta={orgMeta}
-                query={query}
-                setQuery={setQuery}
-                range={range}
-                setRange={setRange}
-                burnRange={burnRange}
-                setBurnRange={setBurnRange}
-                setFilterAssignee={setFilterAssignee}
-                setFilterState={setFilterState}
-                setFilterProjectStatus={setFilterProjectStatus}
-                setFilterTag={setFilterTag}
-                setFilterIssueType={setFilterIssueType}
               />
             } />
             <Route path="/by-assignee" element={
               <ByAssignee
                 allIssues={allIssues}
-                query={query}
-                setQuery={setQuery}
-                setFilterAssignee={setFilterAssignee}
-                setFilterState={setFilterState}
-                setFilterProjectStatus={setFilterProjectStatus}
-                setFilterTag={setFilterTag}
-                setFilterIssueType={setFilterIssueType}
               />
             } />
             <Route path="/by-tags" element={
               <ByTags
                 allIssues={allIssues}
-                query={query}
-                setQuery={setQuery}
-                setFilterAssignee={setFilterAssignee}
-                setFilterState={setFilterState}
-                setFilterProjectStatus={setFilterProjectStatus}
-                setFilterTag={setFilterTag}
-                setFilterIssueType={setFilterIssueType}
               />
             } />
             <Route path="/project-board" element={
@@ -387,20 +361,6 @@ export default function App() {
             <Route path="/all-issues" element={
               <AllIssues
                 allIssuesWithStatus={allIssuesWithStatus}
-                query={query}
-                setQuery={setQuery}
-                filterState={filterState}
-                setFilterState={setFilterState}
-                filterProjectStatus={filterProjectStatus}
-                setFilterProjectStatus={setFilterProjectStatus}
-                filterAssignee={filterAssignee}
-                setFilterAssignee={setFilterAssignee}
-                filterTag={filterTag}
-                setFilterTag={setFilterTag}
-                filterMilestone={filterMilestone}
-                setFilterMilestone={setFilterMilestone}
-                filterIssueType={filterIssueType}
-                setFilterIssueType={setFilterIssueType}
                 projectStatusOptions={projectStatusOptions}
                 assigneeOptions={assigneeOptions}
                 tagOptions={tagOptions}
