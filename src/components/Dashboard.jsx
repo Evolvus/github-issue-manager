@@ -4,24 +4,25 @@ import { Card, CardHeader, CardContent, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
-  import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-  import { ExternalLink, Search } from "lucide-react";
-  import {
-    ResponsiveContainer,
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    Tooltip,
-    Legend,
-    CartesianGrid,
-    PieChart,
-    Pie,
-    Cell,
-    BarChart,
-    Bar,
-  } from "recharts";
-  import TimeAgo from "./TimeAgo";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { ExternalLink, Search } from "lucide-react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+} from "recharts";
+import TimeAgo from "./TimeAgo";
+import useAppStore from "../store";
 
 // Helper functions
 function fmtDate(iso) {
@@ -69,18 +70,20 @@ export default function Dashboard({
   allIssues,
   allIssuesWithStatus,
   orgMeta,
-  query,
-  setQuery,
-  range,
-  setRange,
-  burnRange,
-  setBurnRange,
-  setFilterAssignee,
-  setFilterState,
-  setFilterProjectStatus,
-  setFilterTag,
-  setFilterIssueType,
 }) {
+  const {
+    query,
+    setQuery,
+    range,
+    setRange,
+    burnRange,
+    setBurnRange,
+    setFilterAssignee,
+    setFilterState,
+    setFilterProjectStatus,
+    setFilterTag,
+    setFilterIssueType,
+  } = useAppStore();
   const openedClosedSeries = useMemo(() => {
     if (range === "year") {
       const months = monthsRange(12);

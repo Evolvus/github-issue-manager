@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Download, Search } from "lucide-react";
 import IssueCard, { ExpandedIssueCard } from "./IssueCard";
+import useAppStore from "../store";
 
 function issuesToCSV(issues) {
   const headers = ["Number", "Title", "URL", "State", "Repository", "ProjectStatus", "CreatedAt", "ClosedAt"];
@@ -31,28 +32,30 @@ function downloadCSV(issues, filename) {
   URL.revokeObjectURL(url);
 }
 
-export default function AllIssues({ 
-  allIssuesWithStatus, 
-  query, 
-  setQuery,
-  filterState,
-  setFilterState,
-  filterProjectStatus,
-  setFilterProjectStatus,
-  filterAssignee,
-  setFilterAssignee,
-  filterIssueType,
-  setFilterIssueType,
-  filterTag,
-  setFilterTag,
-  filterMilestone,
-  setFilterMilestone,
+export default function AllIssues({
+  allIssuesWithStatus,
   projectStatusOptions,
   assigneeOptions,
   issueTypeOptions,
   tagOptions,
   milestoneOptions
 }) {
+  const {
+    query,
+    setQuery,
+    filterState,
+    setFilterState,
+    filterProjectStatus,
+    setFilterProjectStatus,
+    filterAssignee,
+    setFilterAssignee,
+    filterIssueType,
+    setFilterIssueType,
+    filterTag,
+    setFilterTag,
+    filterMilestone,
+    setFilterMilestone,
+  } = useAppStore();
   const PAGE_SIZE = 50;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [clickedIssue, setClickedIssue] = useState(null);
