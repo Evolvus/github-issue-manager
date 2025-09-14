@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { Download, Maximize2, Minimize2 } from "lucide-react";
 import IssueCard, { ExpandedIssueCard } from "./IssueCard";
 import jsPDF from "jspdf";
+import { fetchIssueWithTimeline } from "../api/github";
 
 function formatDateForHeader(date) {
   const d = new Date(date);
@@ -341,15 +342,23 @@ async function downloadReleaseNotes(sp, orgName) {
   doc.save(`${sp.title}-release-notes.pdf`);
 }
 
-export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, handleDrop, orgName }) {
+
+export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, handleDrop, orgName, token }) {
   const [clickedIssue, setClickedIssue] = useState(null);
   const [clickedIssueData, setClickedIssueData] = useState(null);
 
   if (!sprint) return null;
 
-  const handleIssueClick = (issue) => {
+  const handleIssueClick = async (issue) => {
     setClickedIssue(issue.id);
-    setClickedIssueData(issue);
+    try {
+      const [owner, repo] = (issue.repository?.nameWithOwner || "").split("/");
+      const full = await fetchIssueWithTimeline(token, owner, repo, issue.number);
+      setClickedIssueData(full || issue);
+    } catch (e) {
+      console.error(e);
+      setClickedIssueData(issue);
+    }
   };
 
   const handleClosePopup = () => {

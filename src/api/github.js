@@ -194,3 +194,65 @@ export async function fetchIssueTypes(token, org) {
   return data?.issue_types || data;
 }
 
+export const ISSUE_WITH_TIMELINE = `
+  query IssueWithTimeline($owner: String!, $name: String!, $number: Int!, $after: String) {
+    repository(owner: $owner, name: $name) {
+      issue(number: $number) {
+        id
+        number
+        title
+        body
+        url
+        state
+        createdAt
+        closedAt
+        repository { nameWithOwner url }
+        assignees(first: 10) { nodes { login avatarUrl url } }
+        labels(first: 20) { nodes { id name color } }
+        milestone { id title url dueOn description }
+        issueType { id name color }
+        timelineItems(
+          first: 50,
+          after: $after,
+          itemTypes: [ASSIGNED_EVENT, UNASSIGNED_EVENT, CLOSED_EVENT, REOPENED_EVENT, LABELED_EVENT, UNLABELED_EVENT, ISSUE_COMMENT]
+        ) {
+          nodes {
+            __typename
+            ... on ClosedEvent { createdAt actor { login avatarUrl url } }
+            ... on ReopenedEvent { createdAt actor { login avatarUrl url } }
+            ... on LabeledEvent { createdAt actor { login avatarUrl url } label { name color } }
+            ... on UnlabeledEvent { createdAt actor { login avatarUrl url } label { name color } }
+            ... on AssignedEvent { createdAt actor { login avatarUrl url } assignee { ... on User { login avatarUrl url } } }
+            ... on UnassignedEvent { createdAt actor { login avatarUrl url } assignee { ... on User { login avatarUrl url } } }
+            ... on IssueComment { id createdAt author { login avatarUrl url } body }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+`;
+
+export async function fetchIssueWithTimeline(token, owner, repo, number) {
+  let after = null;
+  let issue = null;
+  let timeline = [];
+  while (true) {
+    const data = await githubGraphQL(token, ISSUE_WITH_TIMELINE, { owner, name: repo, number, after });
+    const node = data?.repository?.issue;
+    if (!node) break;
+    if (!issue) {
+      issue = { ...node };
+      delete issue.timelineItems;
+    }
+    const nodes = node.timelineItems?.nodes || [];
+    timeline = timeline.concat(nodes);
+    if (!node.timelineItems?.pageInfo?.hasNextPage) break;
+    after = node.timelineItems.pageInfo.endCursor;
+  }
+  if (issue) {
+    issue.timelineItems = timeline;
+  }
+  return issue;
+}
+

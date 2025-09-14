@@ -172,6 +172,7 @@ export default function Sprints({ allIssues, orgMeta, projects, token }) {
           toggleFullScreen={toggleFullScreen}
           handleDrop={handleDrop}
           orgName={orgMeta?.name}
+          token={token}
         />
       )}
     </div>
