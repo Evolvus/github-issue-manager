@@ -48,11 +48,50 @@ function convertImgTagsToMarkdown(text = "") {
 
 // Expanded Issue Card for Tooltip
 export function ExpandedIssueCard({ issue }) {
-  const otherLabels = issue.labels.filter(l => !/^type:\s*/i.test(l.name));
+  const otherLabels = (issue.labels || []).filter(l => !/^type:\s*/i.test(l.name));
   const typeColor = normalizeHex(issue.issueType?.color);
   const processedBody = convertImgTagsToMarkdown(issue.body || "");
   const displayBody =
     processedBody.length > 500 ? `${processedBody.substring(0, 500)}...` : processedBody;
+
+  const renderTimelineItem = (item, idx) => {
+    const time = item.createdAt ? new Date(item.createdAt).toLocaleString() : "";
+    switch (item.__typename) {
+      case "IssueComment":
+        return (
+          <li key={idx}>
+            <div className="text-gray-700"><span className="font-medium">{item.author?.login}</span> commented {time}</div>
+            {item.body && <div className="ml-4 text-gray-600">{item.body.length > 200 ? item.body.substring(0,200) + "..." : item.body}</div>}
+          </li>
+        );
+      case "ClosedEvent":
+        return (
+          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> closed this issue {time}</li>
+        );
+      case "ReopenedEvent":
+        return (
+          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> reopened this issue {time}</li>
+        );
+      case "LabeledEvent":
+        return (
+          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> added label {item.label?.name} {time}</li>
+        );
+      case "UnlabeledEvent":
+        return (
+          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> removed label {item.label?.name} {time}</li>
+        );
+      case "AssignedEvent":
+        return (
+          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> assigned {item.assignee?.login} {time}</li>
+        );
+      case "UnassignedEvent":
+        return (
+          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> unassigned {item.assignee?.login} {time}</li>
+        );
+      default:
+        return null;
+    }
+  };
   
   return (
     <div className="bg-white border rounded-lg shadow-xl p-5 max-w-md">
@@ -197,12 +236,20 @@ export function ExpandedIssueCard({ issue }) {
           </div>
         </div>
       )}
+      {issue.timelineItems && issue.timelineItems.length > 0 && (
+        <div className="border-t pt-3 mt-3">
+          <div className="text-sm text-gray-500 font-medium mb-2">History:</div>
+          <ul className="space-y-2 text-sm max-h-40 overflow-y-auto">
+            {issue.timelineItems.map((t, i) => renderTimelineItem(t, i))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function IssueCard({ issue, showMilestone = true }) {
-  const otherLabels = issue.labels.filter(l => !/^type:\s*/i.test(l.name));
+  const otherLabels = (issue.labels || []).filter(l => !/^type:\s*/i.test(l.name));
   const typeColor = normalizeHex(issue.issueType?.color);
   
   return (

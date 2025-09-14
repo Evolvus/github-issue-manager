@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { Download, Search } from "lucide-react";
 import IssueCard, { ExpandedIssueCard } from "./IssueCard";
 import useAppStore from "../store";
+import { fetchIssueWithTimeline } from "../api/github";
 
 function issuesToCSV(issues) {
   const headers = ["Number", "Title", "URL", "State", "Repository", "ProjectStatus", "CreatedAt", "ClosedAt"];
@@ -38,7 +39,8 @@ export default function AllIssues({
   assigneeOptions,
   issueTypeOptions,
   tagOptions,
-  milestoneOptions
+  milestoneOptions,
+  token,
 }) {
   const {
     query,
@@ -92,9 +94,16 @@ export default function AllIssues({
     [filteredAllIssues, visibleCount]
   );
 
-  const handleIssueClick = (issue) => {
+  const handleIssueClick = async (issue) => {
     setClickedIssue(issue.id);
-    setClickedIssueData(issue);
+    try {
+      const [owner, repo] = (issue.repository?.nameWithOwner || "").split("/");
+      const full = await fetchIssueWithTimeline(token, owner, repo, issue.number);
+      setClickedIssueData(full || issue);
+    } catch (e) {
+      console.error(e);
+      setClickedIssueData(issue);
+    }
   };
 
   const handleClosePopup = () => {

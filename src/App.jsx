@@ -342,6 +342,7 @@ export default function App() {
                 tagOptions={tagOptions}
                 milestoneOptions={milestoneOptions}
                 issueTypeOptions={issueTypeOptions}
+                token={token}
               />
             } />
             <Route path="*" element={<Navigate to="/" replace />} />
