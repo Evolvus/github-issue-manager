@@ -48,7 +48,7 @@ function convertImgTagsToMarkdown(text = "") {
 
 // Expanded Issue Card for Tooltip
 export function ExpandedIssueCard({ issue }) {
-  const otherLabels = issue.labels.filter(l => !/^type:\s*/i.test(l.name));
+  const otherLabels = (issue.labels || []).filter(l => !/^type:\s*/i.test(l.name));
   const typeColor = normalizeHex(issue.issueType?.color);
   const processedBody = convertImgTagsToMarkdown(issue.body || "");
   const displayBody =
@@ -249,7 +249,7 @@ export function ExpandedIssueCard({ issue }) {
 }
 
 export default function IssueCard({ issue, showMilestone = true }) {
-  const otherLabels = issue.labels.filter(l => !/^type:\s*/i.test(l.name));
+  const otherLabels = (issue.labels || []).filter(l => !/^type:\s*/i.test(l.name));
   const typeColor = normalizeHex(issue.issueType?.color);
   
   return (

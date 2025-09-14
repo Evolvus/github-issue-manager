@@ -244,6 +244,9 @@ export async function fetchIssueWithTimeline(token, owner, repo, number) {
     if (!issue) {
       issue = { ...node };
       delete issue.timelineItems;
+      // Normalize nested connection fields to plain arrays
+      issue.assignees = issue.assignees?.nodes || [];
+      issue.labels = issue.labels?.nodes || [];
     }
     const nodes = node.timelineItems?.nodes || [];
     timeline = timeline.concat(nodes);
