@@ -150,11 +150,6 @@ async function generateReleaseSummary(issues, orgName, versionName) {
 
 ${getProgressInsights()}
 
-This comprehensive release includes ${issues.length} total issues across multiple categories:
-• ${features.length} new features and enhancements
-• ${bugs.length} bug fixes and improvements
-• ${other.length} other updates and optimizations
-
 Progress Status:
 • ${closedIssues.length} issues completed (${Math.round((closedIssues.length / issues.length) * 100)}%)
 • ${openIssues.length} issues still in progress (${Math.round((openIssues.length / issues.length) * 100)}%)
@@ -195,31 +190,86 @@ async function downloadReleaseNotes(sp, orgName) {
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.text("Release Progress", 20, 70);
+  // Release Progress (compact with progress bar)
   doc.setFont("helvetica", "normal");
-  doc.text(`Total Issues: ${sp.issues.length}`, 20, 78);
-  doc.text(`Completed: ${closedIssues.length} (${Math.round((closedIssues.length / sp.issues.length) * 100)}%)`, 20, 86);
-  doc.text(`In Progress: ${openIssues.length} (${Math.round((openIssues.length / sp.issues.length) * 100)}%)`, 20, 94);
+  const totalIssues = sp.issues.length || 0;
+  const completed = closedIssues.length || 0;
+  const percent = totalIssues ? Math.round((completed / totalIssues) * 100) : 0;
+  const barX = 20, barY = 78, barW = 170, barH = 8;
+  // background
+  doc.setFillColor(230, 230, 230);
+  doc.rect(barX, barY, barW, barH, 'F');
+  // completed portion
+  doc.setFillColor(34, 197, 94); // green-500
+  const filledW = Math.round((barW * percent) / 100);
+  if (filledW > 0) doc.rect(barX, barY, filledW, barH, 'F');
+  // label
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`Completed ${completed}/${totalIssues} (${percent}%)`, barX, barY + 14);
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.text("Issue Categories", 20, 108);
+  // Issue Categories (compact pie chart + legend)
   doc.setFont("helvetica", "normal");
-  doc.text(`Features & Enhancements: ${features.length}`, 20, 116);
-  doc.text(`Bug Fixes: ${bugs.length}`, 20, 124);
-  doc.text(`Other Updates: ${other.length}`, 20, 132);
+  const pieSize = 40;
+  const pieX = 28; // top-left for image placement
+  const pieY = 110;
+  const counts = [features.length, bugs.length, other.length];
+  const colors = [
+    [59, 130, 246],  // features - blue-500
+    [239, 68, 68],   // bugs - red-500
+    [156, 163, 175], // other - gray-500
+  ];
+  const pieDataUrl = renderPieDataURL(counts, colors, pieSize);
+  if (pieDataUrl) {
+    doc.addImage(pieDataUrl, 'PNG', pieX, pieY, pieSize, pieSize);
+  }
+  // Legend
+  const legendX = pieX + pieSize + 8;
+  const legendY = pieY + 4;
+  const legend = [
+    { name: 'Features & Enhancements', count: features.length, color: colors[0] },
+    { name: 'Bug Fixes', count: bugs.length, color: colors[1] },
+    { name: 'Other Updates', count: other.length, color: colors[2] },
+  ];
+  doc.setFontSize(10);
+  legend.forEach((row, idx) => {
+    const y = legendY + idx * 12;
+    const [r, g, b] = row.color;
+    doc.setFillColor(r, g, b);
+    doc.rect(legendX, y - 4, 6, 6, 'F');
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${row.name}: ${row.count}`, legendX + 10, y + 1);
+  });
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  doc.text("Release Summary", 20, 146);
+  // Ensure Release Summary starts below the pie chart area
+  const afterCategoriesY = Math.max(146, 110 + 40 + 12); // pieY + pieSize + margin
+  doc.text("Release Summary", 20, afterCategoriesY);
   doc.setFont("helvetica", "normal");
   const summaryLines = doc.splitTextToSize(summary, 170);
-  doc.text(summaryLines, 20, 154);
+  // Write summary safely within page bounds (avoid overlapping footer)
+  const topY = afterCategoriesY + 8;
+  const maxBottom = 270; // leave a thinner margin before footer (~280)
+  const lineGap = 4; // tighter line height to reduce spacing
+  const maxLines = Math.max(0, Math.floor((maxBottom - topY) / lineGap));
+  const linesToRender = summaryLines.length > maxLines && maxLines > 0
+    ? [...summaryLines.slice(0, maxLines - 1), "..."]
+    : summaryLines;
+  let cursorY = topY;
+  for (const ln of linesToRender) {
+    doc.text(ln, 20, cursorY);
+    cursorY += lineGap;
+  }
   let yPosition = 154 + summaryLines.length * 5 + 10;
 
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.text(`Page 1 of ${Math.max(2, features.length > 0 ? 3 : 2)}`, 20, 280);
-  doc.text(`Generated on ${new Date().toLocaleDateString()}`, 120, 280);
+  doc.text(`Generated on ${new Date().toLocaleString()}`, 120, 280);
 
   if (features.length > 0) {
     doc.addPage();
@@ -258,7 +308,7 @@ async function downloadReleaseNotes(sp, orgName) {
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.text(`Page 2 of ${Math.max(2, bugs.length > 0 ? 3 : 2)}`, 20, 280);
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 120, 280);
+    doc.text(`Generated on ${new Date().toLocaleString()}`, 120, 280);
   }
 
   if (bugs.length > 0) {
@@ -298,7 +348,7 @@ async function downloadReleaseNotes(sp, orgName) {
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.text(`Page 3 of ${Math.max(3, other.length > 0 ? 4 : 3)}`, 20, 280);
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 120, 280);
+    doc.text(`Generated on ${new Date().toLocaleString()}`, 120, 280);
   }
 
   if (other.length > 0) {
@@ -338,10 +388,40 @@ async function downloadReleaseNotes(sp, orgName) {
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.text(`Page 4 of 4`, 20, 280);
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 120, 280);
+    doc.text(`Generated on ${new Date().toLocaleString()}`, 120, 280);
   }
 
   doc.save(`${sp.title}-release-notes.pdf`);
+}
+
+function renderPieDataURL(values = [], colors = [], size = 40) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const total = values.reduce((a, b) => a + b, 0) || 1;
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2;
+    let start = -Math.PI / 2; // start at top
+    values.forEach((v, i) => {
+      const frac = v / total;
+      const end = start + frac * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, start, end);
+      ctx.closePath();
+      const col = colors[i] || [200, 200, 200];
+      ctx.fillStyle = `rgb(${col[0]}, ${col[1]}, ${col[2]})`;
+      ctx.fill();
+      start = end;
+    });
+    return canvas.toDataURL('image/png');
+  } catch (e) {
+    console.error('Pie render failed', e);
+    return null;
+  }
 }
 
 
