@@ -17,12 +17,12 @@ const getInitialDensity = () => {
 
 const initialState = {
   query: "",
-  filterState: "",
-  filterProjectStatus: "",
-  filterAssignee: "",
-  filterTag: "",
-  filterMilestone: "",
-  filterIssueType: "",
+  filterState: [],
+  filterProjectStatus: [],
+  filterAssignee: [],
+  filterTag: [],
+  filterMilestone: [],
+  filterIssueType: [],
   range: "month",
   burnRange: "month",
   theme: getInitialTheme(),

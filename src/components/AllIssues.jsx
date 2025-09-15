@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import MultiSelect from "./ui/MultiSelect";
 import { Download, Search } from "lucide-react";
 import { downloadIssuesExcel } from "../utils/exportExcel";
 import IssueCard, { IssueOverlayCard } from "./IssueCard";
@@ -42,18 +43,18 @@ export default function AllIssues({
   const filteredAllIssues = useMemo(() => {
     const q = query.toLowerCase();
     return allIssuesWithStatus.filter(i =>
-      (!filterState || i.state === filterState) &&
-      (!filterProjectStatus || i.project_status === filterProjectStatus) &&
-      (!filterAssignee ||
-        (filterAssignee === "(unassigned)"
-          ? i.assignees.length === 0
-          : i.assignees.some(a => a.login === filterAssignee))) &&
-      (!filterIssueType || i.issueType?.name === filterIssueType) &&
-      (!filterTag || i.labels.some(l => l.name === filterTag)) &&
-      (!filterMilestone ||
-        (filterMilestone === "(none)"
-          ? !i.milestone
-          : i.milestone?.title === filterMilestone)) &&
+      (!filterState.length || filterState.includes(i.state)) &&
+      (!filterProjectStatus.length || (i.project_status && filterProjectStatus.includes(i.project_status))) &&
+      (!filterAssignee.length || (
+        (filterAssignee.includes("(unassigned)") && i.assignees.length === 0) ||
+        i.assignees.some(a => filterAssignee.includes(a.login))
+      )) &&
+      (!filterIssueType.length || (i.issueType?.name && filterIssueType.includes(i.issueType.name))) &&
+      (!filterTag.length || i.labels.some(l => filterTag.includes(l.name))) &&
+      (!filterMilestone.length || (
+        (filterMilestone.includes("(none)") && !i.milestone) ||
+        (i.milestone?.title && filterMilestone.includes(i.milestone.title))
+      )) &&
       (!q ||
         i.title.toLowerCase().includes(q) ||
         i.repository?.nameWithOwner?.toLowerCase().includes(q) ||
@@ -88,42 +89,42 @@ export default function AllIssues({
     setClickedIssueData(null);
   };
 
+  const hasAnyFilter =
+    (filterState?.length || 0) +
+    (filterProjectStatus?.length || 0) +
+    (filterAssignee?.length || 0) +
+    (filterIssueType?.length || 0) +
+    (filterTag?.length || 0) +
+    (filterMilestone?.length || 0) > 0;
+
   return (
     <div className="space-y-6">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
             <Input data-quick-open placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-60"/>
           </div>
-        <select value={filterState} onChange={e=>setFilterState(e.target.value)} className="border rounded-md text-sm px-2 py-1">
-          <option value="">All States</option>
-          <option value="OPEN">Open</option>
-          <option value="CLOSED">Closed</option>
-        </select>
-        <select value={filterProjectStatus} onChange={e=>setFilterProjectStatus(e.target.value)} className="border rounded-md text-sm px-2 py-1">
-          <option value="">All Project Statuses</option>
-          {projectStatusOptions.map(st => <option key={st} value={st}>{st}</option>)}
-        </select>
-        <select value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="border rounded-md text-sm px-2 py-1">
-          <option value="">All Assignees</option>
-          {assigneeOptions.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <select value={filterIssueType} onChange={e=>setFilterIssueType(e.target.value)} className="border rounded-md text-sm px-2 py-1">
-          <option value="">All Types</option>
-          {issueTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={filterTag} onChange={e=>setFilterTag(e.target.value)} className="border rounded-md text-sm px-2 py-1">
-          <option value="">All Tags</option>
-          {tagOptions.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={filterMilestone} onChange={e=>setFilterMilestone(e.target.value)} className="border rounded-md text-sm px-2 py-1">
-          <option value="">All Milestones</option>
-          {milestoneOptions.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
+        <MultiSelect options={["OPEN","CLOSED"]} value={filterState} onChange={setFilterState} placeholder="States" />
+        <MultiSelect options={projectStatusOptions} value={filterProjectStatus} onChange={setFilterProjectStatus} placeholder="Project statuses" />
+        <MultiSelect options={assigneeOptions} value={filterAssignee} onChange={setFilterAssignee} placeholder="Assignees" />
+        <MultiSelect options={issueTypeOptions} value={filterIssueType} onChange={setFilterIssueType} placeholder="Types" />
+        <MultiSelect options={tagOptions} value={filterTag} onChange={setFilterTag} placeholder="Tags" />
+        <MultiSelect options={milestoneOptions} value={filterMilestone} onChange={setFilterMilestone} placeholder="Milestones" />
         <Button onClick={() => downloadIssuesExcel(filteredAllIssues, "all-issues.xlsx")} className="ml-auto text-sm">
           <Download className="w-4 h-4"/> Download
         </Button>
       </div>
+      {hasAnyFilter ? (
+        <div className="mb-3 flex flex-wrap gap-2 text-xs">
+          {filterState.map(v => <span key={"st-"+v} className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">State: {v}</span>)}
+          {filterProjectStatus.map(v => <span key={"ps-"+v} className="px-2 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">Status: {v}</span>)}
+          {filterAssignee.map(v => <span key={"as-"+v} className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Assignee: {v}</span>)}
+          {filterIssueType.map(v => <span key={"it-"+v} className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Type: {v}</span>)}
+          {filterTag.map(v => <span key={"tg-"+v} className="px-2 py-1 rounded-full bg-gray-100 text-gray-700 border">Tag: {v}</span>)}
+          {filterMilestone.map(v => <span key={"ms-"+v} className="px-2 py-1 rounded-full bg-pink-50 text-pink-700 border border-pink-200">Milestone: {v}</span>)}
+          <button className="ml-2 underline text-gray-500" onClick={() => { setFilterState([]); setFilterProjectStatus([]); setFilterAssignee([]); setFilterIssueType([]); setFilterTag([]); setFilterMilestone([]); }}>Clear all</button>
+        </div>
+      ) : null}
       
       <div className="mb-3 text-sm text-gray-500">Showing {filteredAllIssues.length} issues</div>
       

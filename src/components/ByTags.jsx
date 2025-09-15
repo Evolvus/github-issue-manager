@@ -52,11 +52,11 @@ export default function ByTags({
   const navigate = useNavigate();
 
   const handleFilterClick = (tag, state = "", projectStatus = "", assignee = "") => {
-    setFilterTag(tag);
-    setFilterState(state);
-    setFilterProjectStatus(projectStatus);
-    setFilterAssignee(assignee);
-    setFilterIssueType("");
+    setFilterTag(tag ? [tag] : []);
+    setFilterState(state ? [state] : []);
+    setFilterProjectStatus(projectStatus ? [projectStatus] : []);
+    setFilterAssignee(assignee ? [assignee] : []);
+    setFilterIssueType([]);
     setQuery("");
     navigate("/all-issues");
   };

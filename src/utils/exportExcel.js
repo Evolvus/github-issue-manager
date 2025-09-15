@@ -15,7 +15,7 @@ function joinLabels(labels) {
   return labels.map((l) => l?.name).filter(Boolean).join(', ');
 }
 
-export function downloadIssuesExcel(issues, filename = 'issues.xlsx', sheetName = 'Issues') {
+function makeSheet(issues, sheetName = 'Issues') {
   const headers = [
     'Number',
     'Title',
@@ -32,7 +32,7 @@ export function downloadIssuesExcel(issues, filename = 'issues.xlsx', sheetName 
   ];
 
   const rows = issues.map((i) => [
-    i.number,
+    toText(i.number),
     toText(i.title),
     toText(i.url),
     toText(i.state),
@@ -42,8 +42,8 @@ export function downloadIssuesExcel(issues, filename = 'issues.xlsx', sheetName 
     toText(i.milestone?.dueOn || ''),
     toText(i.createdAt || ''),
     toText(i.closedAt || ''),
-    joinNames(i.assignees || []),
-    joinLabels(i.labels || []),
+    toText(joinNames(i.assignees || [])),
+    toText(joinLabels(i.labels || [])),
   ]);
 
   const data = [headers, ...rows];
@@ -72,8 +72,43 @@ export function downloadIssuesExcel(issues, filename = 'issues.xlsx', sheetName 
     { wch: 28 }, // Labels
   ];
 
+  return ws;
+}
+
+export function downloadIssuesExcel(issues, filename = 'issues.xlsx', sheetName = 'Issues') {
   const wb = XLSX.utils.book_new();
+  const ws = makeSheet(issues, sheetName);
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function sanitizeSheetName(name) {
+  const invalid = /[\\/?*\[\]:]/g; // Excel invalid chars
+  let out = (name || 'Sheet').replace(invalid, ' ').substring(0, 31).trim();
+  return out || 'Sheet';
+}
+
+export function downloadSprintsWorkbook(sprints, filename = 'milestones.xlsx') {
+  const wb = XLSX.utils.book_new();
+  const used = new Set();
+  (sprints || []).forEach((sp, idx) => {
+    const nameBase = sanitizeSheetName(sp.title || `Sprint ${idx + 1}`);
+    let name = nameBase;
+    let n = 1;
+    while (used.has(name)) {
+      name = sanitizeSheetName(`${nameBase}-${++n}`);
+    }
+    used.add(name);
+    const ws = makeSheet(sp.issues || [], name);
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  });
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);

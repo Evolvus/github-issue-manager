@@ -1,13 +1,23 @@
 import React from "react";
 import { Input } from "./ui/input";
-import { Search as SearchIcon } from "lucide-react";
+import { Button } from "./ui/button";
+import { Search as SearchIcon, Download as DownloadIcon } from "lucide-react";
+import { downloadSprintsWorkbook } from "../utils/exportExcel";
 
 export default function MilestoneTabs({ sprints, activeTab, setActiveTab, search = "", setSearch = () => {} }) {
   return (
     <div className="mb-6">
       <div className="mb-4 flex items-center gap-2">
         <h3 className="text-lg font-semibold text-gray-900">Milestones</h3>
-        <div className="relative w-full max-w-md ml-auto">
+        <Button
+          className="ml-auto text-xs border px-3 py-1"
+          onClick={() => downloadSprintsWorkbook(sprints, "milestones.xlsx")}
+          title="Export all milestones to Excel"
+        >
+          <DownloadIcon className="w-4 h-4 mr-1" />
+          Export All
+        </Button>
+        <div className="relative w-full max-w-md">
           <SearchIcon className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
           <Input
             placeholder="Search sprint issues (number, title, description, assignee)"

@@ -47,11 +47,11 @@ export default function ByAssignee({
   const navigate = useNavigate();
 
   const handleFilterClick = (assignee, state = "", projectStatus = "", tag = "") => {
-    setFilterAssignee(assignee);
-    setFilterState(state);
-    setFilterProjectStatus(projectStatus);
-    setFilterTag(tag);
-    setFilterIssueType("");
+    setFilterAssignee(assignee ? [assignee] : []);
+    setFilterState(state ? [state] : []);
+    setFilterProjectStatus(projectStatus ? [projectStatus] : []);
+    setFilterTag(tag ? [tag] : []);
+    setFilterIssueType([]);
     setQuery("");
     navigate("/all-issues");
   };
