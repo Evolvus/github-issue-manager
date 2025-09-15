@@ -351,6 +351,7 @@ export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, ha
   const [showBurndown, setShowBurndown] = useState(false);
   const [showCFD, setShowCFD] = useState(false);
   const [showCycleLead, setShowCycleLead] = useState(false);
+  const [showNotInBacklog, setShowNotInBacklog] = useState(false);
 
   if (!sprint) return null;
 
@@ -419,6 +420,15 @@ export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, ha
               <Badge variant="secondary" className="text-sm px-3 py-1">
                 {sprint.closed}/{sprint.open + sprint.closed} completed
               </Badge>
+              <label className="flex items-center gap-1 text-xs text-gray-700 border rounded px-2 py-1 bg-white">
+                <input
+                  type="checkbox"
+                  className="accent-blue-600"
+                  checked={showNotInBacklog}
+                  onChange={(e) => setShowNotInBacklog(e.target.checked)}
+                />
+                Show "Not in backlog"
+              </label>
               <Button
                 className="text-xs border px-3 py-1"
                 onClick={() => downloadIssuesExcel(sprint.issues || [], `${sprint.title}.xlsx`, sprint.title)}
@@ -467,8 +477,8 @@ export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, ha
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-6 md:grid-cols-3 sm:grid-cols-2 gap-6">
-        {sprint.grouped.map(([status, list]) => (
+      <div className={`grid ${showNotInBacklog ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} md:grid-cols-3 sm:grid-cols-2 gap-6`}>
+        {(showNotInBacklog ? sprint.grouped : sprint.grouped.filter(([s]) => s !== 'Not in backlog')).map(([status, list]) => (
           <div key={status} className="bg-white border rounded-xl shadow-sm">
             <div className="p-4 border-b bg-gray-50 rounded-t-xl">
               <div className="flex items-center justify-between">
