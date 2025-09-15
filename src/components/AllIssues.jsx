@@ -3,7 +3,7 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import MultiSelect from "./ui/MultiSelect";
-import { Download, Search } from "lucide-react";
+import { Download, Search, X } from "lucide-react";
 import { downloadIssuesExcel } from "../utils/exportExcel";
 import IssueCard, { IssueOverlayCard } from "./IssueCard";
 import useAppStore from "../store";
@@ -97,6 +97,13 @@ export default function AllIssues({
     (filterTag?.length || 0) +
     (filterMilestone?.length || 0) > 0;
 
+  const removeState = (v) => setFilterState(filterState.filter(x => x !== v));
+  const removeProjectStatus = (v) => setFilterProjectStatus(filterProjectStatus.filter(x => x !== v));
+  const removeAssignee = (v) => setFilterAssignee(filterAssignee.filter(x => x !== v));
+  const removeIssueType = (v) => setFilterIssueType(filterIssueType.filter(x => x !== v));
+  const removeTag = (v) => setFilterTag(filterTag.filter(x => x !== v));
+  const removeMilestone = (v) => setFilterMilestone(filterMilestone.filter(x => x !== v));
+
   return (
     <div className="space-y-6">
       <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -116,12 +123,54 @@ export default function AllIssues({
       </div>
       {hasAnyFilter ? (
         <div className="mb-3 flex flex-wrap gap-2 text-xs">
-          {filterState.map(v => <span key={"st-"+v} className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">State: {v}</span>)}
-          {filterProjectStatus.map(v => <span key={"ps-"+v} className="px-2 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">Status: {v}</span>)}
-          {filterAssignee.map(v => <span key={"as-"+v} className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Assignee: {v}</span>)}
-          {filterIssueType.map(v => <span key={"it-"+v} className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Type: {v}</span>)}
-          {filterTag.map(v => <span key={"tg-"+v} className="px-2 py-1 rounded-full bg-gray-100 text-gray-700 border">Tag: {v}</span>)}
-          {filterMilestone.map(v => <span key={"ms-"+v} className="px-2 py-1 rounded-full bg-pink-50 text-pink-700 border border-pink-200">Milestone: {v}</span>)}
+          {filterState.map(v => (
+            <div key={"st-"+v} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              <span>State: {v}</span>
+              <button aria-label={`Remove state ${v}`} className="hover:bg-blue-100 rounded-full p-0.5" onClick={() => removeState(v)}>
+                <X className="w-3 h-3"/>
+              </button>
+            </div>
+          ))}
+          {filterProjectStatus.map(v => (
+            <div key={"ps-"+v} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+              <span>Status: {v}</span>
+              <button aria-label={`Remove status ${v}`} className="hover:bg-purple-100 rounded-full p-0.5" onClick={() => removeProjectStatus(v)}>
+                <X className="w-3 h-3"/>
+              </button>
+            </div>
+          ))}
+          {filterAssignee.map(v => (
+            <div key={"as-"+v} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span>Assignee: {v}</span>
+              <button aria-label={`Remove assignee ${v}`} className="hover:bg-emerald-100 rounded-full p-0.5" onClick={() => removeAssignee(v)}>
+                <X className="w-3 h-3"/>
+              </button>
+            </div>
+          ))}
+          {filterIssueType.map(v => (
+            <div key={"it-"+v} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+              <span>Type: {v}</span>
+              <button aria-label={`Remove type ${v}`} className="hover:bg-amber-100 rounded-full p-0.5" onClick={() => removeIssueType(v)}>
+                <X className="w-3 h-3"/>
+              </button>
+            </div>
+          ))}
+          {filterTag.map(v => (
+            <div key={"tg-"+v} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-700 border">
+              <span>Tag: {v}</span>
+              <button aria-label={`Remove tag ${v}`} className="hover:bg-gray-200 rounded-full p-0.5" onClick={() => removeTag(v)}>
+                <X className="w-3 h-3"/>
+              </button>
+            </div>
+          ))}
+          {filterMilestone.map(v => (
+            <div key={"ms-"+v} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-pink-50 text-pink-700 border border-pink-200">
+              <span>Milestone: {v}</span>
+              <button aria-label={`Remove milestone ${v}`} className="hover:bg-pink-100 rounded-full p-0.5" onClick={() => removeMilestone(v)}>
+                <X className="w-3 h-3"/>
+              </button>
+            </div>
+          ))}
           <button className="ml-2 underline text-gray-500" onClick={() => { setFilterState([]); setFilterProjectStatus([]); setFilterAssignee([]); setFilterIssueType([]); setFilterTag([]); setFilterMilestone([]); }}>Clear all</button>
         </div>
       ) : null}

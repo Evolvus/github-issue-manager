@@ -251,9 +251,8 @@ export const ISSUE_WITH_TIMELINE = `
         milestone { id title url dueOn description }
         issueType { id name color }
         timelineItems(
-          first: 50,
-          after: $after,
-          itemTypes: [ASSIGNED_EVENT, UNASSIGNED_EVENT, CLOSED_EVENT, REOPENED_EVENT, LABELED_EVENT, UNLABELED_EVENT, ISSUE_COMMENT]
+          first: 100,
+          after: $after
         ) {
           nodes {
             __typename
@@ -264,6 +263,23 @@ export const ISSUE_WITH_TIMELINE = `
             ... on AssignedEvent { createdAt actor { login avatarUrl url } assignee { ... on User { login avatarUrl url } } }
             ... on UnassignedEvent { createdAt actor { login avatarUrl url } assignee { ... on User { login avatarUrl url } } }
             ... on IssueComment { id createdAt author { login avatarUrl url } body }
+            ... on CrossReferencedEvent {
+              createdAt
+              actor { login avatarUrl url }
+              willCloseTarget
+              source {
+                __typename
+                ... on PullRequest {
+                  number
+                  title
+                  url
+                  merged
+                  mergedAt
+                  author { login avatarUrl url }
+                  repository { nameWithOwner }
+                }
+              }
+            }
           }
           pageInfo { hasNextPage endCursor }
         }

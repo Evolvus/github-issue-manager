@@ -56,7 +56,6 @@ export function ExpandedIssueCard({ issue }) {
   const displayBody = processedBody;
 
   const renderTimelineItem = (item, idx) => {
-    const time = item.createdAt ? new Date(item.createdAt).toLocaleString() : "";
     switch (item.__typename) {
       case "IssueComment":
         return (
@@ -68,7 +67,7 @@ export function ExpandedIssueCard({ issue }) {
                 <AvatarFallback className="text-[10px]">{initials(item.author?.login)}</AvatarFallback>
               </Avatar>
               <div className="text-gray-700">
-                <span className="font-medium">{item.author?.login}</span> commented {time}
+                <span className="font-medium">{item.author?.login}</span> commented <TimeAgo iso={item.createdAt} />
               </div>
             </div>
             {item.body && <div className="ml-7 text-gray-600">{item.body}</div>}
@@ -83,7 +82,7 @@ export function ExpandedIssueCard({ issue }) {
                 <AvatarImage src={item.actor?.avatarUrl} />
                 <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
               </Avatar>
-              <div><span className="font-medium">{item.actor?.login}</span> closed this issue {time}</div>
+              <div><span className="font-medium">{item.actor?.login}</span> closed this issue <TimeAgo iso={item.createdAt} /></div>
             </div>
           </li>
         );
@@ -96,7 +95,7 @@ export function ExpandedIssueCard({ issue }) {
                 <AvatarImage src={item.actor?.avatarUrl} />
                 <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
               </Avatar>
-              <div><span className="font-medium">{item.actor?.login}</span> reopened this issue {time}</div>
+              <div><span className="font-medium">{item.actor?.login}</span> reopened this issue <TimeAgo iso={item.createdAt} /></div>
             </div>
           </li>
         );
@@ -119,7 +118,7 @@ export function ExpandedIssueCard({ issue }) {
                     {item.label.name}
                   </span>
                 )}
-                <span>{time}</span>
+                <span><TimeAgo iso={item.createdAt} /></span>
               </div>
             </div>
           </li>
@@ -143,7 +142,7 @@ export function ExpandedIssueCard({ issue }) {
                     {item.label.name}
                   </span>
                 )}
-                <span>{time}</span>
+                <span><TimeAgo iso={item.createdAt} /></span>
               </div>
             </div>
           </li>
@@ -169,7 +168,7 @@ export function ExpandedIssueCard({ issue }) {
                     <span className="font-medium">{item.assignee?.login}</span>
                   </>
                 )}
-                <span>{time}</span>
+                <span><TimeAgo iso={item.createdAt} /></span>
               </div>
             </div>
           </li>
@@ -195,11 +194,63 @@ export function ExpandedIssueCard({ issue }) {
                     <span className="font-medium">{item.assignee?.login}</span>
                   </>
                 )}
-                <span>{time}</span>
+                <span><TimeAgo iso={item.createdAt} /></span>
               </div>
             </div>
           </li>
         );
+      case "CrossReferencedEvent": {
+        const src = item.source;
+        if (src?.__typename === 'PullRequest') {
+          return (
+            <li key={idx} className="relative pl-6">
+              <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+              <div className="flex items-start gap-2 text-gray-700">
+                <Avatar className="w-5 h-5 mt-0.5">
+                  <AvatarImage src={item.actor?.avatarUrl} />
+                  <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div>
+                    <span className="font-medium">{item.actor?.login}</span> linked pull request{' '}
+                    <a className="text-blue-600 underline" href={src.url} target="_blank" rel="noreferrer">
+                      {src.repository?.nameWithOwner}#{src.number}
+                    </a>{' '}— {src.title} {src.merged ? <span className="ml-1 text-purple-700">(merged)</span> : null}
+                  </div>
+                  <div className="text-xs text-gray-500"><TimeAgo iso={item.createdAt} /></div>
+                </div>
+              </div>
+            </li>
+          );
+        }
+        return null;
+      }
+      case "CrossReferencedEvent": {
+        const src = item.source;
+        if (src?.__typename === 'PullRequest') {
+          return (
+            <li key={idx} className="relative pl-6">
+              <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+              <div className="flex items-start gap-2 text-gray-700">
+                <Avatar className="w-5 h-5 mt-0.5">
+                  <AvatarImage src={item.actor?.avatarUrl} />
+                  <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div>
+                    <span className="font-medium">{item.actor?.login}</span> linked pull request{' '}
+                    <a className="text-blue-600 underline" href={src.url} target="_blank" rel="noreferrer">
+                      {src.repository?.nameWithOwner}#{src.number}
+                    </a>{' '}— {src.title} {src.merged ? <span className="ml-1 text-purple-700">(merged)</span> : null}
+                  </div>
+                  <div className="text-xs text-gray-500"><TimeAgo iso={item.createdAt} /></div>
+                </div>
+              </div>
+            </li>
+          );
+        }
+        return null;
+      }
       default:
         return null;
     }
@@ -380,7 +431,7 @@ export function IssueOverlayCard({ issue }) {
                 <AvatarFallback className="text-[10px]">{initials(item.author?.login)}</AvatarFallback>
               </Avatar>
               <div className="text-gray-700">
-                <span className="font-medium">{item.author?.login}</span> commented {time}
+                <span className="font-medium">{item.author?.login}</span> commented <TimeAgo iso={item.createdAt} />
               </div>
             </div>
             {item.body && <div className="ml-7 text-gray-600">{item.body}</div>}
@@ -395,7 +446,7 @@ export function IssueOverlayCard({ issue }) {
                 <AvatarImage src={item.actor?.avatarUrl} />
                 <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
               </Avatar>
-              <div><span className="font-medium">{item.actor?.login}</span> closed this issue {time}</div>
+              <div><span className="font-medium">{item.actor?.login}</span> closed this issue <TimeAgo iso={item.createdAt} /></div>
             </div>
           </li>
         );
@@ -408,7 +459,7 @@ export function IssueOverlayCard({ issue }) {
                 <AvatarImage src={item.actor?.avatarUrl} />
                 <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
               </Avatar>
-              <div><span className="font-medium">{item.actor?.login}</span> reopened this issue {time}</div>
+              <div><span className="font-medium">{item.actor?.login}</span> reopened this issue <TimeAgo iso={item.createdAt} /></div>
             </div>
           </li>
         );
@@ -431,7 +482,7 @@ export function IssueOverlayCard({ issue }) {
                     {item.label.name}
                   </span>
                 )}
-                <span>{time}</span>
+                <span><TimeAgo iso={item.createdAt} /></span>
               </div>
             </div>
           </li>
@@ -455,7 +506,7 @@ export function IssueOverlayCard({ issue }) {
                     {item.label.name}
                   </span>
                 )}
-                <span>{time}</span>
+                <span><TimeAgo iso={item.createdAt} /></span>
               </div>
             </div>
           </li>
@@ -481,7 +532,7 @@ export function IssueOverlayCard({ issue }) {
                     <span className="font-medium">{item.assignee?.login}</span>
                   </>
                 )}
-                <span>{time}</span>
+                <span><TimeAgo iso={item.createdAt} /></span>
               </div>
             </div>
           </li>
