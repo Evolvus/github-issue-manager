@@ -48,6 +48,7 @@ const REMOVE_FROM_PROJECT = `
 
 export default function Sprints({ allIssues, orgMeta, projects, token }) {
   const [statusMap, setStatusMap] = useState(new Map());
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const map = new Map();
@@ -152,6 +153,33 @@ export default function Sprints({ allIssues, orgMeta, projects, token }) {
 
   const activeSprint = sprintData.find(sp => sp.id === activeTab);
 
+  const filteredActiveSprint = useMemo(() => {
+    if (!activeSprint) return null;
+    const q = search.trim().toLowerCase();
+    if (!q) return activeSprint;
+    const matches = (i) => {
+      const num = String(i.number || "");
+      const title = (i.title || "").toLowerCase();
+      const body = (i.body || "").toLowerCase();
+      const assignees = (i.assignees || []).map(a => (a.login || "").toLowerCase());
+      return (
+        num.includes(q) ||
+        title.includes(q) ||
+        body.includes(q) ||
+        assignees.some(a => a.includes(q))
+      );
+    };
+    const filteredIssues = (activeSprint.issues || []).filter(matches);
+    const open = filteredIssues.filter(i => i.state === 'OPEN').length;
+    const closed = filteredIssues.filter(i => i.state === 'CLOSED').length;
+    return {
+      ...activeSprint,
+      open,
+      closed,
+      grouped: activeSprint.grouped.map(([status, list]) => [status, list.filter(matches)]),
+    };
+  }, [activeSprint, search]);
+
   if (!sprintData.length) {
     return (
       <Card>
@@ -164,10 +192,10 @@ export default function Sprints({ allIssues, orgMeta, projects, token }) {
 
   return (
     <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-white p-6' : ''}`}>
-      <MilestoneTabs sprints={sprintData} activeTab={activeTab} setActiveTab={setActiveTab} />
-      {activeSprint && (
+      <MilestoneTabs sprints={sprintData} activeTab={activeTab} setActiveTab={setActiveTab} search={search} setSearch={setSearch} />
+      {(filteredActiveSprint || activeSprint) && (
         <SprintBoard
-          sprint={activeSprint}
+          sprint={filteredActiveSprint || activeSprint}
           isFullScreen={isFullScreen}
           toggleFullScreen={toggleFullScreen}
           handleDrop={handleDrop}

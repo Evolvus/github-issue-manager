@@ -443,8 +443,8 @@ export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, ha
             </div>
             <div className="p-2">
               <ul
-                className={`space-y-3 overflow-auto pr-1 ${
-                  isFullScreen ? "max-h-[calc(100vh-200px)]" : "max-h-[calc(100vh-250px)]"
+                className={`space-y-3 pr-1 ${
+                  isFullScreen ? "overflow-auto max-h-[calc(100vh-200px)]" : "overflow-visible max-h-none"
                 }`}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
