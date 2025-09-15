@@ -3,35 +3,12 @@ import { Card, CardHeader, CardContent, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { FolderKanban, Download, ChevronDown, Search } from "lucide-react";
+import { downloadIssuesExcel } from "../utils/exportExcel";
 import TimeAgo from "./TimeAgo";
 import { IssueOverlayCard } from "./IssueCard";
 import { fetchIssueWithTimeline } from "../api/github";
 
-function issuesToCSV(issues) {
-  const headers = ["Number", "Title", "URL", "State", "Repository", "ProjectStatus", "CreatedAt", "ClosedAt"];
-  const rows = issues.map(i => [
-    i.number,
-    '"' + (i.title || '').replace(/"/g, '""') + '"',
-    i.url || '',
-    i.state || '',
-    (i.repository?.nameWithOwner || i.repository || ''),
-    i.project_status || '',
-    i.createdAt || '',
-    i.closedAt || ''
-  ]);
-  return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-}
-
-function downloadCSV(issues, filename) {
-  const csv = issuesToCSV(issues);
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+// Excel export handled via utils/exportExcel
 
 export default function ProjectBoard({ projects, token }) {
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -122,7 +99,7 @@ export default function ProjectBoard({ projects, token }) {
                   <CardTitle>{status}</CardTitle>
                   <div className="flex items-center gap-1">
                     <Badge variant="secondary">{filteredList.length}</Badge>
-                    <Download className="w-4 h-4 cursor-pointer" onClick={() => downloadCSV(filteredList, `${status}.csv`)} />
+                    <Download className="w-4 h-4 cursor-pointer" onClick={() => downloadIssuesExcel(filteredList, `${status}.xlsx`, status)} />
                     <ChevronDown onClick={() => toggleCollapse(status)} className={`w-4 h-4 cursor-pointer transition-transform ${collapsedCols[status] ? '-rotate-90' : ''}`} />
                   </div>
                 </div>

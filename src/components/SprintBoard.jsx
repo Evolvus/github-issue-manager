@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { Download, Maximize2, Minimize2 } from "lucide-react";
 import IssueCard, { IssueOverlayCard } from "./IssueCard";
 import jsPDF from "jspdf";
+import { downloadIssuesExcel } from "../utils/exportExcel";
 import { fetchIssueWithTimeline } from "../api/github";
 
 function formatDateForHeader(date) {
@@ -385,6 +386,14 @@ export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, ha
                 <Download className="w-4 h-4 mr-1" />
                 Release Notes
               </Button>
+              <Button
+                className="text-xs border px-3 py-1"
+                onClick={() => downloadIssuesExcel(sprint.issues || [], `${sprint.title}.xlsx`, sprint.title)}
+                title="Export Sprint to Excel"
+              >
+                <Download className="w-4 h-4 mr-1" />
+                Export Excel
+              </Button>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-sm px-3 py-1">
@@ -436,9 +445,16 @@ export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, ha
             <div className="p-4 border-b bg-gray-50 rounded-t-xl">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-gray-700">{status}</span>
-                <Badge variant="secondary" className="text-xs">
-                  {list.length}
-                </Badge>
+                <div className="flex items-center gap-1">
+                  <Badge variant="secondary" className="text-xs">
+                    {list.length}
+                  </Badge>
+                  <Download
+                    className="w-4 h-4 cursor-pointer"
+                    onClick={() => downloadIssuesExcel(list, `${sprint.title}-${status}.xlsx`, status)}
+                    title="Export this column to Excel"
+                  />
+                </div>
               </div>
             </div>
             <div className="p-2">

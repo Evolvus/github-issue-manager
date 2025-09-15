@@ -3,35 +3,12 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Download, Search } from "lucide-react";
+import { downloadIssuesExcel } from "../utils/exportExcel";
 import IssueCard, { IssueOverlayCard } from "./IssueCard";
 import useAppStore from "../store";
 import { fetchIssueWithTimeline } from "../api/github";
 
-function issuesToCSV(issues) {
-  const headers = ["Number", "Title", "URL", "State", "Repository", "ProjectStatus", "CreatedAt", "ClosedAt"];
-  const rows = issues.map(i => [
-    i.number,
-    '"' + (i.title || '').replace(/"/g, '""') + '"',
-    i.url || '',
-    i.state || '',
-    (i.repository?.nameWithOwner || i.repository || ''),
-    i.project_status || '',
-    i.createdAt || '',
-    i.closedAt || ''
-  ]);
-  return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-}
-
-function downloadCSV(issues, filename) {
-  const csv = issuesToCSV(issues);
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+// Excel export handled via utils/exportExcel
 
 export default function AllIssues({
   allIssuesWithStatus,
@@ -143,7 +120,7 @@ export default function AllIssues({
           <option value="">All Milestones</option>
           {milestoneOptions.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
-        <Button onClick={() => downloadCSV(filteredAllIssues, "all-issues.csv")} className="ml-auto text-sm">
+        <Button onClick={() => downloadIssuesExcel(filteredAllIssues, "all-issues.xlsx")} className="ml-auto text-sm">
           <Download className="w-4 h-4"/> Download
         </Button>
       </div>
