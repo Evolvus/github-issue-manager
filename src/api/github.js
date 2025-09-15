@@ -1,4 +1,5 @@
 const GQL_ENDPOINT = "https://api.github.com/graphql";
+import { getWithTTL, setWithTTL, cacheGetEntry, isFresh } from "../cache/cache";
 
 export async function githubGraphQL(token, query, variables = {}) {
   const res = await fetch(GQL_ENDPOINT, {
@@ -119,7 +120,25 @@ export const PROJECT_ITEMS = `
   }
 `;
 
-export async function fetchProjectsWithStatus(token, org) {
+export async function fetchProjectsWithStatus(token, org, options = {}) {
+  const { swr = false, onUpdate } = options;
+  const cacheKey = `projects:${org}`;
+  if (swr) {
+    const entry = await cacheGetEntry(cacheKey);
+    if (entry) {
+      // trigger background refresh
+      setTimeout(async () => {
+        try {
+          const fresh = await fetchProjectsWithStatus(token, org);
+          onUpdate && onUpdate(fresh);
+        } catch {}
+      }, 0);
+      return entry.value;
+    }
+  } else {
+    const cached = await getWithTTL(cacheKey);
+    if (cached) return cached;
+  }
   let projects = [];
   let cursor = null;
   while (true) {
@@ -179,10 +198,28 @@ export async function fetchProjectsWithStatus(token, org) {
     }
     out.push({ id: proj.id, number: proj.number, title: proj.title, url: proj.url, issues: items, statusFieldId, statusOptions });
   }
+  await setWithTTL(cacheKey, out, 10 * 60 * 1000); // 10 minutes
   return out;
 }
 
-export async function fetchIssueTypes(token, org) {
+export async function fetchIssueTypes(token, org, options = {}) {
+  const { swr = false, onUpdate } = options;
+  const cacheKey = `issueTypes:${org}`;
+  if (swr) {
+    const entry = await cacheGetEntry(cacheKey);
+    if (entry) {
+      setTimeout(async () => {
+        try {
+          const fresh = await fetchIssueTypes(token, org);
+          onUpdate && onUpdate(fresh);
+        } catch {}
+      }, 0);
+      return entry.value;
+    }
+  } else {
+    const cached = await getWithTTL(cacheKey);
+    if (cached) return cached;
+  }
   const res = await fetch(`https://api.github.com/orgs/${encodeURIComponent(org)}/issue-types`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -191,7 +228,9 @@ export async function fetchIssueTypes(token, org) {
   });
   if (!res.ok) throw new Error(`GitHub REST error: ${res.status}`);
   const data = await res.json();
-  return data?.issue_types || data;
+  const out = data?.issue_types || data;
+  await setWithTTL(cacheKey, out, 24 * 60 * 60 * 1000); // 24 hours
+  return out;
 }
 
 export const ISSUE_WITH_TIMELINE = `
@@ -233,7 +272,24 @@ export const ISSUE_WITH_TIMELINE = `
   }
 `;
 
-export async function fetchIssueWithTimeline(token, owner, repo, number) {
+export async function fetchIssueWithTimeline(token, owner, repo, number, options = {}) {
+  const { swr = false, onUpdate } = options;
+  const cacheKey = `issue:${owner}/${repo}#${number}`;
+  if (swr) {
+    const entry = await cacheGetEntry(cacheKey);
+    if (entry) {
+      setTimeout(async () => {
+        try {
+          const fresh = await fetchIssueWithTimeline(token, owner, repo, number);
+          onUpdate && onUpdate(fresh);
+        } catch {}
+      }, 0);
+      return entry.value;
+    }
+  } else {
+    const cached = await getWithTTL(cacheKey);
+    if (cached) return cached;
+  }
   let after = null;
   let issue = null;
   let timeline = [];
@@ -255,7 +311,61 @@ export async function fetchIssueWithTimeline(token, owner, repo, number) {
   }
   if (issue) {
     issue.timelineItems = timeline;
+    await setWithTTL(cacheKey, issue, 24 * 60 * 60 * 1000); // 24 hours
   }
   return issue;
 }
 
+// Aggregate org repos + issues with caching
+export async function fetchOrgReposIssues(token, org, options = {}) {
+  const { swr = false, onUpdate } = options;
+  const cacheKey = `orgReposIssues:${org}`;
+  if (swr) {
+    const entry = await cacheGetEntry(cacheKey);
+    if (entry) {
+      setTimeout(async () => {
+        try {
+          const fresh = await fetchOrgReposIssues(token, org);
+          onUpdate && onUpdate(fresh);
+        } catch {}
+      }, 0);
+      return entry.value;
+    }
+  } else {
+    const cached = await getWithTTL(cacheKey);
+    if (cached) return cached;
+  }
+  let allRepos = [];
+  let cursor = null;
+  for (let page = 0; page < 4; page++) { // up to ~120 repos (4 * 30)
+    const data = await githubGraphQL(token, ORG_REPOS_ISSUES, { org, after: cursor });
+    const orgNode = data.organization;
+    if (!orgNode) throw new Error("Organization not found or access denied.");
+    const nodes = orgNode.repositories.nodes || [];
+    allRepos = allRepos.concat(nodes.map(n => ({
+      id: n.id,
+      name: n.name,
+      url: n.url,
+      nameWithOwner: n.nameWithOwner,
+      issues: (n.issues?.nodes || []).map(i => ({
+        id: i.id,
+        number: i.number,
+        title: i.title,
+        body: i.body,
+        url: i.url,
+        state: i.state,
+        createdAt: i.createdAt,
+        closedAt: i.closedAt,
+        repository: i.repository,
+        assignees: i.assignees?.nodes || [],
+        labels: i.labels?.nodes || [],
+        milestone: i.milestone || null,
+        issueType: i.issueType || null,
+      }))
+    })));
+    if (!orgNode.repositories.pageInfo.hasNextPage) break;
+    cursor = orgNode.repositories.pageInfo.endCursor;
+  }
+  await setWithTTL(cacheKey, allRepos, 10 * 60 * 1000); // 10 minutes
+  return allRepos;
+}

@@ -73,7 +73,7 @@ export default function ProjectBoard({ projects, token }) {
     setClickedIssue(issue.id);
     try {
       const [owner, repo] = (issue.repository?.nameWithOwner || "").split("/");
-      const full = await fetchIssueWithTimeline(token, owner, repo, issue.number);
+      const full = await fetchIssueWithTimeline(token, owner, repo, issue.number, { swr: true, onUpdate: setClickedIssueData });
       setClickedIssueData(full || issue);
     } catch (e) {
       console.error(e);

@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Card, CardHeader, CardContent, CardTitle } from "./components/ui/card";
 import { Loader2, ShieldQuestion } from "lucide-react";
-import { githubGraphQL, ORG_REPOS_ISSUES, fetchProjectsWithStatus, fetchIssueTypes } from "./api/github";
+import { githubGraphQL, ORG_REPOS_ISSUES, fetchProjectsWithStatus, fetchIssueTypes, fetchOrgReposIssues } from "./api/github";
 import useAppStore from "./store";
 import AppHeader from "./components/AppHeader";
 
@@ -139,41 +139,16 @@ export default function App() {
     setProjects([]);
     setIssueTypes([]);
     try {
-      let allRepos = [];
-      let cursor = null;
-      const typesPromise = fetchIssueTypes(token, org);
-      for (let page = 0; page < 4; page++) { // up to ~120 repos (4 * 30)
-        const data = await githubGraphQL(token, ORG_REPOS_ISSUES, { org, after: cursor });
-        const orgNode = data.organization;
-        if (!orgNode) throw new Error("Organization not found or access denied.");
-        setOrgMeta({ name: orgNode.name, url: orgNode.url });
-        const nodes = orgNode.repositories.nodes || [];
-        allRepos = allRepos.concat(nodes.map(n => ({
-          id: n.id,
-          name: n.name,
-          url: n.url,
-          nameWithOwner: n.nameWithOwner,
-          issues: (n.issues?.nodes || []).map(i => ({
-            id: i.id,
-            number: i.number,
-            title: i.title,
-            body: i.body,
-            url: i.url,
-            state: i.state,
-            createdAt: i.createdAt,
-            closedAt: i.closedAt,
-            repository: i.repository,
-            assignees: i.assignees?.nodes || [],
-            labels: i.labels?.nodes || [],
-            milestone: i.milestone || null,
-            issueType: i.issueType || null,
-          }))
-        })));
-        if (!orgNode.repositories.pageInfo.hasNextPage) break;
-        cursor = orgNode.repositories.pageInfo.endCursor;
-      }
+      // SWR: show cached immediately (even if stale) and refresh in background
+      const typesPromise = fetchIssueTypes(token, org, { swr: true, onUpdate: setIssueTypes });
+      const allRepos = await fetchOrgReposIssues(token, org, { swr: true, onUpdate: setRepos });
+      // Fetch org meta from a quick one-shot query to avoid redesign; reuse existing call
+      const metaData = await githubGraphQL(token, ORG_REPOS_ISSUES, { org, after: null });
+      const orgNode = metaData.organization;
+      if (!orgNode) throw new Error("Organization not found or access denied.");
+      setOrgMeta({ name: orgNode.name, url: orgNode.url });
       setRepos(allRepos);
-      const boards = await fetchProjectsWithStatus(token, org);
+      const boards = await fetchProjectsWithStatus(token, org, { swr: true, onUpdate: setProjects });
       setProjects(boards);
       const types = await typesPromise;
       setIssueTypes(types);
