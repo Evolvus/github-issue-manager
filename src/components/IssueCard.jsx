@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardHeader, CardContent, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Button } from "./ui/button";
 import ReactMarkdown from "react-markdown";
 import TimeAgo from "./TimeAgo";
+import { Maximize2, Minimize2 } from "lucide-react";
 
 function initials(str = "?") {
   const parts = str.split(/\s+|\//g).filter(Boolean);
@@ -51,42 +53,152 @@ export function ExpandedIssueCard({ issue }) {
   const otherLabels = (issue.labels || []).filter(l => !/^type:\s*/i.test(l.name));
   const typeColor = normalizeHex(issue.issueType?.color);
   const processedBody = convertImgTagsToMarkdown(issue.body || "");
-  const displayBody =
-    processedBody.length > 500 ? `${processedBody.substring(0, 500)}...` : processedBody;
+  const displayBody = processedBody;
 
   const renderTimelineItem = (item, idx) => {
     const time = item.createdAt ? new Date(item.createdAt).toLocaleString() : "";
     switch (item.__typename) {
       case "IssueComment":
         return (
-          <li key={idx}>
-            <div className="text-gray-700"><span className="font-medium">{item.author?.login}</span> commented {time}</div>
-            {item.body && <div className="ml-4 text-gray-600">{item.body.length > 200 ? item.body.substring(0,200) + "..." : item.body}</div>}
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.author?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.author?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="text-gray-700">
+                <span className="font-medium">{item.author?.login}</span> commented {time}
+              </div>
+            </div>
+            {item.body && <div className="ml-7 text-gray-600">{item.body}</div>}
           </li>
         );
       case "ClosedEvent":
         return (
-          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> closed this issue {time}</li>
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> closed this issue {time}</div>
+            </div>
+          </li>
         );
       case "ReopenedEvent":
         return (
-          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> reopened this issue {time}</li>
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> reopened this issue {time}</div>
+            </div>
+          </li>
         );
       case "LabeledEvent":
         return (
-          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> added label {item.label?.name} {time}</li>
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span><span className="font-medium">{item.actor?.login}</span> added label</span>
+                {item.label && (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: `#${normalizeHex(item.label.color)}`, color: getContrastColor(normalizeHex(item.label.color)) }}
+                  >
+                    {item.label.name}
+                  </span>
+                )}
+                <span>{time}</span>
+              </div>
+            </div>
+          </li>
         );
       case "UnlabeledEvent":
         return (
-          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> removed label {item.label?.name} {time}</li>
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span><span className="font-medium">{item.actor?.login}</span> removed label</span>
+                {item.label && (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: `#${normalizeHex(item.label.color)}`, color: getContrastColor(normalizeHex(item.label.color)) }}
+                  >
+                    {item.label.name}
+                  </span>
+                )}
+                <span>{time}</span>
+              </div>
+            </div>
+          </li>
         );
       case "AssignedEvent":
         return (
-          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> assigned {item.assignee?.login} {time}</li>
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{item.actor?.login}</span>
+                <span>assigned</span>
+                {item.assignee && (
+                  <>
+                    <Avatar className="w-5 h-5">
+                      <AvatarImage src={item.assignee?.avatarUrl} />
+                      <AvatarFallback className="text-[10px]">{initials(item.assignee?.login)}</AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{item.assignee?.login}</span>
+                  </>
+                )}
+                <span>{time}</span>
+              </div>
+            </div>
+          </li>
         );
       case "UnassignedEvent":
         return (
-          <li key={idx} className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> unassigned {item.assignee?.login} {time}</li>
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{item.actor?.login}</span>
+                <span>unassigned</span>
+                {item.assignee && (
+                  <>
+                    <Avatar className="w-5 h-5">
+                      <AvatarImage src={item.assignee?.avatarUrl} />
+                      <AvatarFallback className="text-[10px]">{initials(item.assignee?.login)}</AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{item.assignee?.login}</span>
+                  </>
+                )}
+                <span>{time}</span>
+              </div>
+            </div>
+          </li>
         );
       default:
         return null;
@@ -94,7 +206,7 @@ export function ExpandedIssueCard({ issue }) {
   };
   
   return (
-    <div className="bg-white border rounded-lg shadow-xl p-5 max-w-md">
+    <div className="bg-white border rounded-lg shadow-xl p-6 w-full max-w-2xl">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
@@ -212,7 +324,7 @@ export function ExpandedIssueCard({ issue }) {
       {processedBody && (
         <div className="border-t pt-3">
           <div className="text-sm text-gray-500 font-medium mb-2">Description:</div>
-          <div className="text-sm text-gray-700 leading-relaxed max-h-32 overflow-y-auto prose prose-sm max-w-none">
+          <div className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
             <ReactMarkdown
               components={{
                 // Customize markdown components for better styling
@@ -239,7 +351,318 @@ export function ExpandedIssueCard({ issue }) {
       {issue.timelineItems && issue.timelineItems.length > 0 && (
         <div className="border-t pt-3 mt-3">
           <div className="text-sm text-gray-500 font-medium mb-2">History:</div>
-          <ul className="space-y-2 text-sm max-h-40 overflow-y-auto">
+          <ul className="space-y-4 text-sm relative ml-2 pl-3 border-l border-gray-200">
+            {issue.timelineItems.map((t, i) => renderTimelineItem(t, i))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// New: Overlay Issue Card with summary + expand toggle
+export function IssueOverlayCard({ issue }) {
+  const [expanded, setExpanded] = useState(false);
+  const otherLabels = (issue.labels || []).filter(l => !/^type:\s*/i.test(l.name));
+  const typeColor = normalizeHex(issue.issueType?.color);
+  const processedBody = convertImgTagsToMarkdown(issue.body || "");
+
+  const renderTimelineItem = (item, idx) => {
+    const time = item.createdAt ? new Date(item.createdAt).toLocaleString() : "";
+    switch (item.__typename) {
+      case "IssueComment":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.author?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.author?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="text-gray-700">
+                <span className="font-medium">{item.author?.login}</span> commented {time}
+              </div>
+            </div>
+            {item.body && <div className="ml-7 text-gray-600">{item.body}</div>}
+          </li>
+        );
+      case "ClosedEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> closed this issue {time}</div>
+            </div>
+          </li>
+        );
+      case "ReopenedEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> reopened this issue {time}</div>
+            </div>
+          </li>
+        );
+      case "LabeledEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span><span className="font-medium">{item.actor?.login}</span> added label</span>
+                {item.label && (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: `#${normalizeHex(item.label.color)}`, color: getContrastColor(normalizeHex(item.label.color)) }}
+                  >
+                    {item.label.name}
+                  </span>
+                )}
+                <span>{time}</span>
+              </div>
+            </div>
+          </li>
+        );
+      case "UnlabeledEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span><span className="font-medium">{item.actor?.login}</span> removed label</span>
+                {item.label && (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: `#${normalizeHex(item.label.color)}`, color: getContrastColor(normalizeHex(item.label.color)) }}
+                  >
+                    {item.label.name}
+                  </span>
+                )}
+                <span>{time}</span>
+              </div>
+            </div>
+          </li>
+        );
+      case "AssignedEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{item.actor?.login}</span>
+                <span>assigned</span>
+                {item.assignee && (
+                  <>
+                    <Avatar className="w-5 h-5">
+                      <AvatarImage src={item.assignee?.avatarUrl} />
+                      <AvatarFallback className="text-[10px]">{initials(item.assignee?.login)}</AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{item.assignee?.login}</span>
+                  </>
+                )}
+                <span>{time}</span>
+              </div>
+            </div>
+          </li>
+        );
+      case "UnassignedEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5">
+                <AvatarImage src={item.actor?.avatarUrl} />
+                <AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{item.actor?.login}</span>
+                <span>unassigned</span>
+                {item.assignee && (
+                  <>
+                    <Avatar className="w-5 h-5">
+                      <AvatarImage src={item.assignee?.avatarUrl} />
+                      <AvatarFallback className="text-[10px]">{initials(item.assignee?.login)}</AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{item.assignee?.login}</span>
+                  </>
+                )}
+                <span>{time}</span>
+              </div>
+            </div>
+          </li>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className={`bg-white border rounded-lg shadow-2xl ${expanded ? 'p-6 max-w-3xl' : 'p-5 max-w-md'} w-full`}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex-1 pr-3">
+          <h3 className="font-bold text-gray-900 text-base leading-tight mb-1">
+            <a href={issue.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+              #{issue.number} {issue.title}
+            </a>
+          </h3>
+          <div className="text-sm text-gray-500">{issue.repository?.nameWithOwner}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="flex-shrink-0">
+            {issue.state}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2"
+            title={expanded ? 'Collapse' : 'Expand'}
+            onClick={() => setExpanded(v => !v)}
+          >
+            {expanded ? <Minimize2 className="w-4 h-4"/> : <Maximize2 className="w-4 h-4"/>}
+          </Button>
+        </div>
+      </div>
+
+      {/* Issue Type and Labels */}
+      <div className="mb-4">
+        {issue.issueType && (
+          <div className="mb-2">
+            <span
+              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+              style={{
+                backgroundColor: `#${typeColor}`,
+                color: getContrastColor(typeColor),
+              }}
+            >
+              {issue.issueType.name}
+            </span>
+          </div>
+        )}
+        {otherLabels.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {otherLabels.slice(0, 6).map(l => {
+              const labelColor = normalizeHex(l.color);
+              return (
+                <span
+                  key={l.id}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: `#${labelColor}`, color: getContrastColor(labelColor) }}
+                >
+                  {l.name}
+                </span>
+              );
+            })}
+            {otherLabels.length > 6 && (
+              <span className="text-xs text-gray-500">+{otherLabels.length - 6} more</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Issue Details */}
+      <div className="space-y-2 mb-4 text-sm">
+        {issue.milestone && (
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 font-medium">Milestone:</span>
+            <span className="text-gray-700">{issue.milestone.title}</span>
+          </div>
+        )}
+        {issue.project_status && (
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 font-medium">Status:</span>
+            <span className="text-gray-700">{issue.project_status}</span>
+          </div>
+        )}
+        {issue.createdAt && (
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 font-medium">Created:</span>
+            <span className="text-gray-700">{new Date(issue.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+          </div>
+        )}
+        {issue.closedAt && (
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 font-medium">Closed:</span>
+            <span className="text-gray-700">{new Date(issue.closedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Assignees */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-sm text-gray-500 font-medium">Assignees:</span>
+        </div>
+        {issue.assignees?.length ? (
+          <div className="flex items-center gap-2">
+            {issue.assignees.map(a => (
+              <div key={a.login} className="flex items-center gap-1">
+                <Avatar className="w-6 h-6" title={a.login}>
+                  <AvatarImage src={a.avatarUrl} />
+                  <AvatarFallback className="text-xs">{initials(a.login)}</AvatarFallback>
+                </Avatar>
+                <span className="text-xs text-gray-700">{a.login}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className="text-sm text-gray-500">(unassigned)</span>
+        )}
+      </div>
+
+      {/* Expanded content only when expanded */}
+      {expanded && processedBody && (
+        <div className="border-t pt-3">
+          <div className="text-sm text-gray-500 font-medium mb-2">Description:</div>
+          <div className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                li: ({ children }) => <li className="text-sm">{children}</li>,
+                code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                pre: ({ children }) => <pre className="bg-gray-100 p-2 rounded text-xs font-mono overflow-x-auto mb-2">{children}</pre>,
+                blockquote: ({ children }) => <blockquote className="border-l-4 border-gray-300 pl-3 italic mb-2">{children}</blockquote>,
+                a: ({ href, children }) => <a href={href} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+              }}
+            >
+              {processedBody}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
+
+      {expanded && issue.timelineItems && issue.timelineItems.length > 0 && (
+        <div className="border-t pt-3 mt-3">
+          <div className="text-sm text-gray-500 font-medium mb-2">History:</div>
+          <ul className="space-y-4 text-sm relative ml-2 pl-3 border-l border-gray-200">
             {issue.timelineItems.map((t, i) => renderTimelineItem(t, i))}
           </ul>
         </div>

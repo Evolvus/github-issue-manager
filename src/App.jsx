@@ -324,6 +324,7 @@ export default function App() {
             <Route path="/project-board" element={
               <ProjectBoard 
                 projects={projects}
+                token={token}
               />
             } />
             <Route path="/sprints" element={

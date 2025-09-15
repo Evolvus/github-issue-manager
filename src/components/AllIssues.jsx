@@ -3,7 +3,7 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Download, Search } from "lucide-react";
-import IssueCard, { ExpandedIssueCard } from "./IssueCard";
+import IssueCard, { IssueOverlayCard } from "./IssueCard";
 import useAppStore from "../store";
 import { fetchIssueWithTimeline } from "../api/github";
 
@@ -170,10 +170,10 @@ export default function AllIssues({
           onClick={handleClosePopup}
         >
           <div 
-            className="bg-white border rounded-lg shadow-2xl max-w-2xl max-h-[80vh] overflow-y-auto"
+            className="inline-block max-w-3xl max-h-[80vh] overflow-y-auto bg-transparent border-0 shadow-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <ExpandedIssueCard issue={clickedIssueData} />
+            <IssueOverlayCard issue={clickedIssueData} />
           </div>
         </div>
       )}

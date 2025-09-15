@@ -4,6 +4,8 @@ import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { FolderKanban, Download, ChevronDown, Search } from "lucide-react";
 import TimeAgo from "./TimeAgo";
+import { IssueOverlayCard } from "./IssueCard";
+import { fetchIssueWithTimeline } from "../api/github";
 
 function issuesToCSV(issues) {
   const headers = ["Number", "Title", "URL", "State", "Repository", "ProjectStatus", "CreatedAt", "ClosedAt"];
@@ -31,10 +33,12 @@ function downloadCSV(issues, filename) {
   URL.revokeObjectURL(url);
 }
 
-export default function ProjectBoard({ projects }) {
+export default function ProjectBoard({ projects, token }) {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [collapsedCols, setCollapsedCols] = useState({});
   const [searchTerms, setSearchTerms] = useState({});
+  const [clickedIssue, setClickedIssue] = useState(null);
+  const [clickedIssueData, setClickedIssueData] = useState(null);
 
   const handleDrop = (issueId, newStatus) => {
     // This would typically update the project status via API
@@ -52,10 +56,35 @@ export default function ProjectBoard({ projects }) {
     for (const iss of proj.issues) {
       const statusVal = iss.project_status || "Backlog";
       if (!colMap.has(statusVal)) colMap.set(statusVal, []);
-      colMap.get(statusVal).push({ ...iss, project: proj.title });
+      // Ensure minimal fields exist for card/overlay rendering
+      colMap.get(statusVal).push({
+        ...iss,
+        project: proj.title,
+        assignees: iss.assignees || [],
+        labels: iss.labels || [],
+        milestone: iss.milestone || null,
+        repository: typeof iss.repository === "string" ? { nameWithOwner: iss.repository } : iss.repository,
+      });
     }
     return order.map(st => [st, colMap.get(st) || []]);
   }, [selectedProjectId, projects]);
+
+  const handleIssueClick = async (issue) => {
+    setClickedIssue(issue.id);
+    try {
+      const [owner, repo] = (issue.repository?.nameWithOwner || "").split("/");
+      const full = await fetchIssueWithTimeline(token, owner, repo, issue.number);
+      setClickedIssueData(full || issue);
+    } catch (e) {
+      console.error(e);
+      setClickedIssueData(issue);
+    }
+  };
+
+  const handleClosePopup = () => {
+    setClickedIssue(null);
+    setClickedIssueData(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -111,9 +140,15 @@ export default function ProjectBoard({ projects }) {
               <CardContent>
                 <ul className="space-y-3 max-h-[70vh] overflow-auto pr-1" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault(); const data = JSON.parse(e.dataTransfer.getData('text/plain')); handleDrop(data.issueId, status);}}>
                   {filteredList.map(iss => (
-                    <li key={iss.id} className="p-3 border rounded-xl bg-white shadow-sm" draggable onDragStart={e=>e.dataTransfer.setData('text/plain', JSON.stringify({ issueId: iss.id }))}>
-                      <a href={iss.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline block">#{iss.number} {iss.title}</a>
-                        <div className="text-xs text-gray-500">{iss.repository} • <TimeAgo iso={iss.createdAt} /></div>
+                    <li
+                      key={iss.id}
+                      className="p-3 border rounded-xl bg-white shadow-sm cursor-pointer"
+                      draggable
+                      onDragStart={e=>e.dataTransfer.setData('text/plain', JSON.stringify({ issueId: iss.id }))}
+                      onClick={() => handleIssueClick(iss)}
+                    >
+                      <a href={iss.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline block" onClick={e => e.stopPropagation()}>#{iss.number} {iss.title}</a>
+                        <div className="text-xs text-gray-500">{(iss.repository?.nameWithOwner || iss.repository)} • <TimeAgo iso={iss.createdAt} /></div>
                     </li>
                   ))}
                 </ul>
@@ -126,6 +161,20 @@ export default function ProjectBoard({ projects }) {
           <Card><CardContent className="py-10"><div className="text-sm text-gray-500">No data available.</div></CardContent></Card>
         )}
       </div>
+
+      {clickedIssue && clickedIssueData && (
+        <div
+          className="fixed z-[9999] inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+          onClick={handleClosePopup}
+        >
+          <div
+            className="inline-block max-w-3xl max-h-[80vh] overflow-y-auto bg-transparent border-0 shadow-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <IssueOverlayCard issue={clickedIssueData} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
