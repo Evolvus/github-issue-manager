@@ -106,20 +106,24 @@ export default function AllIssues({
 
   return (
     <div className="space-y-6">
-      <div className="mb-1 flex flex-wrap items-center gap-2">
+      <div className="mb-1 grid grid-cols-[1fr_auto] gap-2 items-start">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"/>
             <Input data-quick-open placeholder="Search issues..." value={query} onChange={e=>setQuery(e.target.value)} className="pl-7 w-60"/>
           </div>
-        <MultiSelect options={["OPEN","CLOSED"]} value={filterState} onChange={setFilterState} placeholder="States" />
-        <MultiSelect options={projectStatusOptions} value={filterProjectStatus} onChange={setFilterProjectStatus} placeholder="Project statuses" />
-        <MultiSelect options={assigneeOptions} value={filterAssignee} onChange={setFilterAssignee} placeholder="Assignees" />
-        <MultiSelect options={issueTypeOptions} value={filterIssueType} onChange={setFilterIssueType} placeholder="Types" />
-        <MultiSelect options={tagOptions} value={filterTag} onChange={setFilterTag} placeholder="Tags" />
-        <MultiSelect options={milestoneOptions} value={filterMilestone} onChange={setFilterMilestone} placeholder="Milestones" />
-        <Button onClick={() => downloadIssuesExcel(filteredAllIssues, "all-issues.xlsx")} className="ml-auto text-sm">
-          <Download className="w-4 h-4"/> Download
-        </Button>
+          <MultiSelect options={["OPEN","CLOSED"]} value={filterState} onChange={setFilterState} placeholder="States" />
+          <MultiSelect options={projectStatusOptions} value={filterProjectStatus} onChange={setFilterProjectStatus} placeholder="Project statuses" />
+          <MultiSelect options={assigneeOptions} value={filterAssignee} onChange={setFilterAssignee} placeholder="Assignees" />
+          <MultiSelect options={issueTypeOptions} value={filterIssueType} onChange={setFilterIssueType} placeholder="Types" />
+          <MultiSelect options={tagOptions} value={filterTag} onChange={setFilterTag} placeholder="Tags" />
+          <MultiSelect options={milestoneOptions} value={filterMilestone} onChange={setFilterMilestone} placeholder="Milestones" />
+        </div>
+        <div className="justify-self-end">
+          <Button onClick={() => downloadIssuesExcel(filteredAllIssues, "all-issues.xlsx")} className="text-sm whitespace-nowrap">
+            <Download className="w-4 h-4"/> Download
+          </Button>
+        </div>
       </div>
       {hasAnyFilter ? (
         <div className="mb-3 flex flex-wrap gap-2 text-xs">

@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Download, Maximize2, Minimize2 } from "lucide-react";
+import { Download, Maximize2, Minimize2, LineChart as LineChartIcon, AreaChart as AreaChartIcon, Clock3 } from "lucide-react";
 import IssueCard, { IssueOverlayCard } from "./IssueCard";
 import jsPDF from "jspdf";
 import { downloadIssuesExcel } from "../utils/exportExcel";
 import { fetchIssueWithTimeline } from "../api/github";
+import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ReferenceArea, AreaChart, Area, BarChart, Bar } from "recharts";
 
 function formatDateForHeader(date) {
   const d = new Date(date);
@@ -347,6 +348,9 @@ async function downloadReleaseNotes(sp, orgName) {
 export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, handleDrop, orgName, token }) {
   const [clickedIssue, setClickedIssue] = useState(null);
   const [clickedIssueData, setClickedIssueData] = useState(null);
+  const [showBurndown, setShowBurndown] = useState(false);
+  const [showCFD, setShowCFD] = useState(false);
+  const [showCycleLead, setShowCycleLead] = useState(false);
 
   if (!sprint) return null;
 
@@ -388,17 +392,41 @@ export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, ha
               </Button>
               <Button
                 className="text-xs border px-3 py-1"
-                onClick={() => downloadIssuesExcel(sprint.issues || [], `${sprint.title}.xlsx`, sprint.title)}
-                title="Export Sprint to Excel"
+                onClick={() => setShowBurndown(true)}
+                title="Show Sprint Burndown"
               >
-                <Download className="w-4 h-4 mr-1" />
-                Export Excel
+                <LineChartIcon className="w-4 h-4 mr-1" />
+                Burndown
+              </Button>
+              <Button
+                className="text-xs border px-3 py-1"
+                onClick={() => setShowCFD(true)}
+                title="Show Cumulative Flow Diagram"
+              >
+                <AreaChartIcon className="w-4 h-4 mr-1" />
+                CFD
+              </Button>
+              <Button
+                className="text-xs border px-3 py-1"
+                onClick={() => setShowCycleLead(true)}
+                title="Show Cycle/Lead Time"
+              >
+                <Clock3 className="w-4 h-4 mr-1" />
+                Cycle/Lead
               </Button>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-sm px-3 py-1">
                 {sprint.closed}/{sprint.open + sprint.closed} completed
               </Badge>
+              <Button
+                className="text-xs border px-3 py-1"
+                onClick={() => downloadIssuesExcel(sprint.issues || [], `${sprint.title}.xlsx`, sprint.title)}
+                title="Export Sprint to Excel"
+              >
+                <Download className="w-4 h-4 mr-1" />
+                Export Excel
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -504,6 +532,420 @@ export default function SprintBoard({ sprint, isFullScreen, toggleFullScreen, ha
           </div>
         </div>
       )}
+      {showBurndown && (
+        <BurndownPopup sprint={sprint} onClose={() => setShowBurndown(false)} />
+      )}
+      {showCFD && (
+        <CFDPopup sprint={sprint} onClose={() => setShowCFD(false)} />
+      )}
+      {showCycleLead && (
+        <CycleLeadPopup sprint={sprint} token={token} onClose={() => setShowCycleLead(false)} />
+      )}
+    </div>
+  );
+}
+
+function daysBetween(start, end) {
+  const out = [];
+  const d = new Date(start);
+  while (d <= end) {
+    out.push(d.toISOString().slice(0,10));
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+function getSprintWindow(sp) {
+  // Prefer milestone due date's month; else infer from issues; else use current month
+  let base = sp?.dueOn ? new Date(sp.dueOn) : null;
+  if (!base) {
+    const firstIssue = (sp?.issues || []).slice().sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt))[0];
+    if (firstIssue) base = new Date(firstIssue.createdAt);
+  }
+  if (!base) base = new Date();
+  const start = new Date(base.getFullYear(), base.getMonth(), 1);
+  const end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+  return { start, end };
+}
+
+function BurndownPopup({ sprint, onClose }) {
+  if (!sprint) return null;
+  const { start, end } = getSprintWindow(sprint);
+  const days = (start && end) ? daysBetween(start, end) : [];
+  const now = new Date();
+  const isCurrentSprint = start && end && now >= start && now <= end;
+  const todayKey = now.toISOString().slice(0,10);
+  const startKey = start ? start.toISOString().slice(0,10) : null;
+
+  let data = days.map((d) => {
+    const endOfDay = new Date(d);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+    const open = sprint.issues.filter((i) => {
+      const created = new Date(i.createdAt);
+      const closed = i.closedAt ? new Date(i.closedAt) : null;
+      return created < endOfDay && (!closed || closed >= endOfDay);
+    }).length;
+    return { date: d, open };
+  });
+  // Fallback: if everything is zero but there are issues, estimate from scope-completed
+  if (data.every(r => r.open === 0) && (sprint.issues?.length || 0) > 0) {
+    data = days.map((d) => {
+      const endOfDay = new Date(d);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+      const scope = sprint.issues.filter(i => new Date(i.createdAt) < endOfDay).length;
+      const completed = sprint.issues.filter(i => i.closedAt && new Date(i.closedAt) < endOfDay).length;
+      return { date: d, open: Math.max(0, scope - completed) };
+    });
+  }
+  const startOpen = data[0]?.open || 0;
+  const total = Math.max(1, data.length - 1);
+  const series = data.map((row, idx) => ({
+    ...row,
+    ideal: Math.max(0, Math.round(startOpen - (startOpen * idx) / total)),
+  }));
+
+  const formatTick = (d) => {
+    const day = d.slice(8, 10);
+    const month = d.slice(5, 7);
+    return `${day}/${month}`;
+  };
+
+  // Traffic-light status for current sprint vs ideal
+  let rag = null;
+  if (isCurrentSprint) {
+    const todayRow = series.find(r => r.date === todayKey);
+    if (todayRow) {
+      const actual = todayRow.open;
+      const ideal = todayRow.ideal;
+      const tolerance = ideal * 0.1; // 10%
+      rag = actual <= ideal ? 'GREEN' : (actual <= ideal + tolerance ? 'AMBER' : 'RED');
+    }
+  }
+  const bandFill = rag==='RED' ? '#fecaca' : rag==='AMBER' ? '#fde68a' : rag==='GREEN' ? '#bbf7d0' : '#e5e7eb';
+
+  return (
+    <div className="fixed z-[9999] inset-0 bg-black bg-opacity-50 flex items-center justify-center" onClick={onClose}>
+      <div className="bg-white border rounded-lg shadow-2xl w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="p-4 border-b flex items-center justify-between">
+          <div className="font-semibold">Sprint Burndown — {sprint.title}</div>
+          <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+        </div>
+        <div className="p-4">
+          {(!start || !end) ? (
+            <div className="text-sm text-gray-500">No milestone due date found.</div>
+          ) : (
+            <div className="relative h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickFormatter={formatTick} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  {isCurrentSprint && startKey && (
+                    <ReferenceArea x1={startKey} x2={todayKey} fill={bandFill} fillOpacity={0.25} />
+                  )}
+                  <Line type="monotone" dataKey="open" name="Remaining Issues" stroke="#3b82f6" />
+                  <Line type="monotone" dataKey="ideal" name="Ideal" stroke="#a3a3a3" strokeDasharray="5 5" />
+                  {isCurrentSprint && (
+                    <ReferenceLine x={todayKey} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'Today', position: 'top', fill: '#ef4444', fontSize: 12 }} />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+              {rag && (
+                <div className="absolute top-2 right-2 bg-white/90 border rounded-md px-3 py-2 text-xs shadow-sm">
+                  <div className="font-medium mb-1">Status: {rag}</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${rag==='RED'?'bg-red-500 ring-2 ring-red-300':'bg-red-200'}`}></span>
+                    <span className={`w-2.5 h-2.5 rounded-full ${rag==='AMBER'?'bg-amber-500 ring-2 ring-amber-300':'bg-amber-200'}`}></span>
+                    <span className={`w-2.5 h-2.5 rounded-full ${rag==='GREEN'?'bg-green-500 ring-2 ring-green-300':'bg-green-200'}`}></span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CFDPopup({ sprint, onClose }) {
+  if (!sprint) return null;
+  const { start, end } = getSprintWindow(sprint);
+  const days = (start && end) ? daysBetween(start, end) : [];
+
+  const classify = (issue) => {
+    const st = (issue.project_status || '').toLowerCase();
+    if (["ready", "in progress", "in review"].includes(st)) return 'inprogress';
+    if (st === 'done' || issue.state === 'CLOSED') return 'done';
+    return 'backlog';
+  };
+
+  const data = days.map(d => {
+    const endOfDay = new Date(d);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+    let backlog = 0, inprogress = 0, done = 0;
+    for (const i of sprint.issues) {
+      const created = new Date(i.createdAt);
+      const closed = i.closedAt ? new Date(i.closedAt) : null;
+      if (created >= endOfDay) continue; // not yet created
+      if (closed && closed < endOfDay) { done++; continue; }
+      const cls = classify(i);
+      if (cls === 'inprogress') inprogress++; else backlog++;
+    }
+    return { date: d, backlog, inprogress, done };
+  });
+
+  const formatTick = (d) => {
+    const day = d.slice(8,10);
+    const mo = d.slice(5,7);
+    return `${day}/${mo}`;
+  };
+
+  return (
+    <div className="fixed z-[9999] inset-0 bg-black/50 flex items-center justify-center" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl" onClick={e=>e.stopPropagation()}>
+        <div className="p-4 border-b flex items-center justify-between">
+          <div className="font-semibold">Cumulative Flow — {sprint.title}</div>
+          <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+        </div>
+        <div className="p-4">
+          {(!start || !end) ? (
+            <div className="text-sm text-gray-500">No milestone due date found.</div>
+          ) : (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data} stackOffset="expand">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickFormatter={formatTick} />
+                  <YAxis tickFormatter={(v)=>`${Math.round(v*100)}%`} />
+                  <Tooltip formatter={(v)=>Array.isArray(v)?v[0]:v} />
+                  <Legend />
+                  <Area type="monotone" dataKey="backlog" name="Backlog" stackId="1" stroke="#9ca3af" fill="#e5e7eb" />
+                  <Area type="monotone" dataKey="inprogress" name="In progress" stackId="1" stroke="#3b82f6" fill="#bfdbfe" />
+                  <Area type="monotone" dataKey="done" name="Done" stackId="1" stroke="#22c55e" fill="#bbf7d0" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function daysBetweenNumbers(min, max, bins = 8) {
+  const step = Math.max(1, Math.ceil((max - min) / bins));
+  const edges = [];
+  for (let v = min; v <= max; v += step) edges.push(v);
+  return { edges, step };
+}
+
+function CycleLeadPopup({ sprint, token, onClose }) {
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState([]);
+  const closed = (sprint.issues || []).filter(i => i.closedAt);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = [];
+        for (const iss of closed) {
+          let assignedAt = null;
+          try {
+            const [owner, repo] = (iss.repository?.nameWithOwner || "").split("/");
+            const full = token ? await fetchIssueWithTimeline(token, owner, repo, iss.number, { swr: true }) : null;
+            const tl = full?.timelineItems || [];
+            const assignEvt = tl.find(t => t.__typename === 'AssignedEvent');
+            assignedAt = assignEvt?.createdAt || null;
+          } catch {}
+          const created = new Date(iss.createdAt);
+          const closedAt = new Date(iss.closedAt);
+          const leadDays = Math.max(0, Math.round((closedAt - created) / 86400000));
+          const cycleStart = assignedAt ? new Date(assignedAt) : created;
+          const cycleDays = Math.max(0, Math.round((closedAt - cycleStart) / 86400000));
+          data.push({
+            number: iss.number,
+            title: iss.title,
+            url: iss.url,
+            leadDays,
+            cycleDays,
+          });
+        }
+        if (!cancelled) setRows(data);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [closed, token]);
+
+  const leadVals = rows.map(r => r.leadDays);
+  const cycleVals = rows.map(r => r.cycleDays);
+  const leadAvg = leadVals.length ? Math.round(leadVals.reduce((a,b)=>a+b,0)/leadVals.length) : 0;
+  const cycleAvg = cycleVals.length ? Math.round(cycleVals.reduce((a,b)=>a+b,0)/cycleVals.length) : 0;
+  const leadMed = leadVals.length ? [...leadVals].sort((a,b)=>a-b)[Math.floor(leadVals.length/2)] : 0;
+  const cycleMed = cycleVals.length ? [...cycleVals].sort((a,b)=>a-b)[Math.floor(cycleVals.length/2)] : 0;
+
+  const histo = (vals) => {
+    if (!vals.length) return [];
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const { edges, step } = daysBetweenNumbers(min, max, 8);
+    const out = edges.map((e,i)=>({
+      bucket: i===edges.length-1 ? `${e}+` : `${e}-${e+step-1}`,
+      count: vals.filter(v => v>=e && v<(e+step)).length,
+    }));
+    return out;
+  };
+  const leadHist = histo(leadVals);
+  const cycleHist = histo(cycleVals);
+
+  return (
+    <div className="fixed z-[9999] inset-0 bg-black/50 flex items-center justify-center" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl" onClick={e=>e.stopPropagation()}>
+        <div className="p-4 border-b flex items-center justify-between">
+          <div className="font-semibold">Cycle/Lead Time — {sprint.title}</div>
+          <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+        </div>
+        <div className="p-4 space-y-4">
+          {loading ? (
+            <div className="text-sm text-gray-500">Computing metrics…</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 border rounded-lg">
+                  <div className="font-medium mb-2">Lead Time (days)</div>
+                  <div className="text-sm text-gray-600 mb-2">Avg {leadAvg} • Median {leadMed} • n={leadVals.length}</div>
+                  <div className="h-40">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={leadHist}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="bucket" angle={-30} textAnchor="end" height={50} />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#3b82f6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <div className="font-medium mb-2">Cycle Time (days)</div>
+                  <div className="text-sm text-gray-600 mb-2">Avg {cycleAvg} • Median {cycleMed} • n={cycleVals.length}</div>
+                  <div className="h-40">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={cycleHist}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="bucket" angle={-30} textAnchor="end" height={50} />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#10b981" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <div className="font-medium mb-2">Closed Issues</div>
+                <div className="max-h-64 overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-600">
+                        <th className="py-1 pr-2">Issue</th>
+                        <th className="py-1 pr-2">Lead</th>
+                        <th className="py-1 pr-2">Cycle</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(r => (
+                        <tr key={r.number} className="border-t">
+                          <td className="py-1 pr-2">
+                            <a href={r.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">#{r.number}</a> {r.title}
+                          </td>
+                          <td className="py-1 pr-2">{r.leadDays}d</td>
+                          <td className="py-1 pr-2">{r.cycleDays}d</td>
+                        </tr>
+                      ))}
+                      {!rows.length && (
+                        <tr><td colSpan={3} className="py-2 text-gray-500">No closed issues in this sprint.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+function BurnupPopup({ sprint, onClose }) {
+  if (!sprint) return null;
+  const { start, end } = getSprintWindow(sprint);
+  const days = (start && end) ? daysBetween(start, end) : [];
+
+  const inScope = (i) => {
+    const st = (i.project_status || '').toLowerCase();
+    return ['backlog','ready','in progress','in review','done'].includes(st);
+  };
+
+  const data = days.map(d => {
+    const endOfDay = new Date(d);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+    const scope = sprint.issues.filter(i => new Date(i.createdAt) < endOfDay && inScope(i)).length;
+    const completed = sprint.issues.filter(i => i.closedAt && new Date(i.closedAt) < endOfDay && inScope(i)).length;
+    return { date: d, scope, completed };
+  });
+
+  const totalDays = Math.max(1, data.length - 1);
+  const finalScope = data[data.length - 1]?.scope || 0;
+  const ideal = data.map((row, idx) => ({ date: row.date, ideal: Math.round((finalScope * idx) / totalDays) }));
+  const series = data.map((row, idx) => ({ ...row, ideal: ideal[idx].ideal }));
+
+  const formatTick = (d) => {
+    const day = d.slice(8,10);
+    const mo = d.slice(5,7);
+    return `${day}/${mo}`;
+  };
+
+  const now = new Date();
+  const isCurrentSprint = start && end && now >= start && now <= end;
+  const todayKey = now.toISOString().slice(0,10);
+
+  return (
+    <div className="fixed z-[9999] inset-0 bg-black/50 flex items-center justify-center" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl" onClick={e=>e.stopPropagation()}>
+        <div className="p-4 border-b flex items-center justify-between">
+          <div className="font-semibold">Burnup — {sprint.title}</div>
+          <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+        </div>
+        <div className="p-4">
+          {(!start || !end) ? (
+            <div className="text-sm text-gray-500">No milestone due date found.</div>
+          ) : (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickFormatter={formatTick} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="scope" name="Scope" stroke="#9ca3af" />
+                  <Line type="monotone" dataKey="completed" name="Completed" stroke="#22c55e" />
+                  <Line type="monotone" dataKey="ideal" name="Ideal" stroke="#a3a3a3" strokeDasharray="5 5" />
+                  {isCurrentSprint && (
+                    <ReferenceLine x={todayKey} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'Today', position: 'top', fill: '#ef4444', fontSize: 12 }} />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
