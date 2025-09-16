@@ -713,6 +713,28 @@ function BurndownPopup({ sprint, onClose }) {
   }
   const bandFill = rag==='RED' ? '#fecaca' : rag==='AMBER' ? '#fde68a' : rag==='GREEN' ? '#bbf7d0' : '#e5e7eb';
 
+  // Build RAG reference bands per-day up to today (or entire range if not current)
+  const dayRag = (row) => {
+    const actual = row.open;
+    const ideal = row.ideal;
+    const threshold = ideal * 0.1;
+    if (actual <= ideal) return 'GREEN';
+    if (actual <= ideal + threshold) return 'AMBER';
+    return 'RED';
+  };
+  const endIndex = isCurrentSprint ? Math.max(0, series.findIndex(r => r.date === todayKey)) : series.length - 1;
+  const ragSegments = [];
+  if (series.length > 1 && endIndex > 0) {
+    let current = dayRag(series[0]);
+    let segStart = series[0].date;
+    for (let i = 0; i < endIndex; i++) {
+      const nextRag = dayRag(series[i+1]);
+      const x2 = series[i+1].date;
+      ragSegments.push({ x1: series[i].date, x2, rag: dayRag(series[i]) });
+      current = nextRag;
+    }
+  }
+
   return (
     <div className="fixed z-[9999] inset-0 bg-black bg-opacity-50 flex items-center justify-center" onClick={onClose}>
       <div className="bg-white border rounded-lg shadow-2xl w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
@@ -732,9 +754,15 @@ function BurndownPopup({ sprint, onClose }) {
                   <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Legend />
-                  {isCurrentSprint && startKey && (
-                    <ReferenceArea x1={startKey} x2={todayKey} fill={bandFill} fillOpacity={0.25} />
-                  )}
+                  {ragSegments.map((seg, idx) => (
+                    <ReferenceArea
+                      key={idx}
+                      x1={seg.x1}
+                      x2={seg.x2}
+                      fill={seg.rag==='GREEN' ? '#bbf7d0' : seg.rag==='AMBER' ? '#fde68a' : '#fecaca'}
+                      fillOpacity={0.25}
+                    />
+                  ))}
                   <Line type="monotone" dataKey="open" name="Remaining Issues" stroke="#3b82f6" />
                   <Line type="monotone" dataKey="ideal" name="Ideal" stroke="#a3a3a3" strokeDasharray="5 5" />
                   {isCurrentSprint && (
