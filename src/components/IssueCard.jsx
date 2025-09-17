@@ -199,6 +199,104 @@ export function ExpandedIssueCard({ issue }) {
             </div>
           </li>
         );
+      case "MilestonedEvent": {
+        const who = item.actor?.login || "System";
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              {item.actor?.avatarUrl ? (
+                <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(who)}</AvatarFallback></Avatar>
+              ) : null}
+              <div><span className="font-medium">{who}</span> added this to the <span className="font-medium">{item.milestoneTitle}</span> milestone <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      }
+      case "DemilestonedEvent": {
+        const who = item.actor?.login || "System";
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              {item.actor?.avatarUrl ? (
+                <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(who)}</AvatarFallback></Avatar>
+              ) : null}
+              <div><span className="font-medium">{who}</span> removed this from the <span className="font-medium">{item.milestoneTitle}</span> milestone <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      }
+      case "AddedToProjectEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> added to project <span className="font-medium">{item.project?.name}</span> <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      case "RemovedFromProjectEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> removed from project <span className="font-medium">{item.project?.name}</span> <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      case "MovedColumnsInProjectEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> moved in project <span className="font-medium">{item.project?.name}</span> from <span className="font-medium">{item.previousProjectColumnName}</span> to <span className="font-medium">{item.projectColumnName}</span> <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      case "RenamedTitleEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> renamed title from <span className="italic">{item.previousTitle}</span> to <span className="italic">{item.currentTitle}</span> <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      case "ConvertedNoteToIssueEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> converted a note to this issue <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      case "MarkedAsDuplicateEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> marked as duplicate <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      case "UnmarkedAsDuplicateEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> unmarked as duplicate <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
       case "CrossReferencedEvent": {
         const src = item.source;
         if (src?.__typename === 'PullRequest') {
@@ -419,7 +517,6 @@ export function IssueOverlayCard({ issue }) {
   const processedBody = convertImgTagsToMarkdown(issue.body || "");
 
   const renderTimelineItem = (item, idx) => {
-    const time = item.createdAt ? new Date(item.createdAt).toLocaleString() : "";
     switch (item.__typename) {
       case "IssueComment":
         return (
@@ -561,6 +658,88 @@ export function IssueOverlayCard({ issue }) {
                 <span>{time}</span>
               </div>
             </div>
+          </li>
+        );
+      case "MilestonedEvent": {
+        const who = item.actor?.login || "System";
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              {item.actor?.avatarUrl ? (
+                <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(who)}</AvatarFallback></Avatar>
+              ) : null}
+              <div><span className="font-medium">{who}</span> added this to the <span className="font-medium">{item.milestoneTitle}</span> milestone <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      }
+      case "DemilestonedEvent": {
+        const who = item.actor?.login || "System";
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              {item.actor?.avatarUrl ? (
+                <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(who)}</AvatarFallback></Avatar>
+              ) : null}
+              <div><span className="font-medium">{who}</span> removed this from the <span className="font-medium">{item.milestoneTitle}</span> milestone <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      }
+      case "AddedToProjectEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> added to project <span className="font-medium">{item.project?.name}</span> <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      case "RemovedFromProjectEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> removed from project <span className="font-medium">{item.project?.name}</span> <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      case "MovedColumnsInProjectEvent":
+        return (
+          <li key={idx} className="relative pl-6">
+            <span className="absolute rounded-full bg-blue-500 border-2 border-white" style={{ left: -6, top: 10, width: 12, height: 12 }} />
+            <div className="flex items-start gap-2 text-gray-700">
+              <Avatar className="w-5 h-5 mt-0.5"><AvatarImage src={item.actor?.avatarUrl} /><AvatarFallback className="text-[10px]">{initials(item.actor?.login)}</AvatarFallback></Avatar>
+              <div><span className="font-medium">{item.actor?.login}</span> moved in project <span className="font-medium">{item.project?.name}</span> from <span className="font-medium">{item.previousProjectColumnName}</span> to <span className="font-medium">{item.projectColumnName}</span> <TimeAgo iso={item.createdAt} /></div>
+            </div>
+          </li>
+        );
+      case "RenamedTitleEvent":
+        return (
+          <li key={idx}>
+            <div className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> renamed title from <span className="italic">{item.previousTitle}</span> to <span className="italic">{item.currentTitle}</span> <TimeAgo iso={item.createdAt} /></div>
+          </li>
+        );
+      case "ConvertedNoteToIssueEvent":
+        return (
+          <li key={idx}>
+            <div className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> converted a note to this issue <TimeAgo iso={item.createdAt} /></div>
+          </li>
+        );
+      case "MarkedAsDuplicateEvent":
+        return (
+          <li key={idx}>
+            <div className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> marked as duplicate <TimeAgo iso={item.createdAt} /></div>
+          </li>
+        );
+      case "UnmarkedAsDuplicateEvent":
+        return (
+          <li key={idx}>
+            <div className="text-gray-700"><span className="font-medium">{item.actor?.login}</span> unmarked as duplicate <TimeAgo iso={item.createdAt} /></div>
           </li>
         );
       default:

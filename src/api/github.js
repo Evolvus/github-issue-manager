@@ -280,6 +280,15 @@ export const ISSUE_WITH_TIMELINE = `
                 }
               }
             }
+            ... on MilestonedEvent { createdAt actor { login avatarUrl url } milestoneTitle }
+            ... on DemilestonedEvent { createdAt actor { login avatarUrl url } milestoneTitle }
+            ... on AddedToProjectEvent { createdAt actor { login avatarUrl url } project { name } }
+            ... on RemovedFromProjectEvent { createdAt actor { login avatarUrl url } project { name } }
+            ... on MovedColumnsInProjectEvent { createdAt actor { login avatarUrl url } project { name } previousProjectColumnName projectColumnName }
+            ... on RenamedTitleEvent { createdAt actor { login avatarUrl url } previousTitle currentTitle }
+            ... on ConvertedNoteToIssueEvent { createdAt actor { login avatarUrl url } }
+            ... on MarkedAsDuplicateEvent { createdAt actor { login avatarUrl url } }
+            ... on UnmarkedAsDuplicateEvent { createdAt actor { login avatarUrl url } }
           }
           pageInfo { hasNextPage endCursor }
         }
