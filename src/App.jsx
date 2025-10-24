@@ -3,9 +3,10 @@ import React, { useEffect, useMemo, useState, Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Card, CardHeader, CardContent, CardTitle } from "./components/ui/card";
 import { Loader2, ShieldQuestion } from "lucide-react";
-import { githubGraphQL, ORG_REPOS_ISSUES, fetchProjectsWithStatus, fetchIssueTypes, fetchOrgReposIssues } from "./api/github";
+import { githubGraphQL, ORG_REPOS_ISSUES, fetchProjectsWithStatus, fetchIssueTypes, fetchOrgReposIssues, createIssue } from "./api/github";
 import useAppStore from "./store";
 import AppHeader from "./components/AppHeader";
+import CreateIssueModal from "./components/CreateIssueModal";
 
 // Import components
 const Dashboard = lazy(() => import("./components/Dashboard"));
@@ -41,6 +42,9 @@ export default function App() {
   const [orgMeta, setOrgMeta] = useState(null);
   const [projects, setProjects] = useState([]);
   const [issueTypes, setIssueTypes] = useState([]);
+  const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
+  const [creatingIssue, setCreatingIssue] = useState(false);
+  const [createIssueError, setCreateIssueError] = useState("");
 
   const {
     query,
@@ -132,9 +136,98 @@ export default function App() {
     window.forceLightMode = forceLightMode;
   }
 
+  const canCreateIssue = !!token && repos.length > 0 && !loading;
+
+  const handleOpenCreateIssue = () => {
+    if (!canCreateIssue) return;
+    setCreateIssueError("");
+    setIsCreateIssueOpen(true);
+  };
+
+  const handleCloseCreateIssue = () => {
+    if (creatingIssue) return;
+    setIsCreateIssueOpen(false);
+    setCreateIssueError("");
+  };
+
+  const handleCreateIssueSubmit = async (input) => {
+    if (!token) {
+      setCreateIssueError("Authentication token is required.");
+      return;
+    }
+    setCreatingIssue(true);
+    setCreateIssueError("");
+    try {
+      const { issue, projectV2Items } = await createIssue(token, input);
+      const repoMeta = repos.find((r) => r.id === input.repositoryId) || null;
+      const repository = {
+        nameWithOwner: issue.repository?.nameWithOwner || repoMeta?.nameWithOwner || "",
+        url: issue.repository?.url || repoMeta?.url || "",
+      };
+      const normalizedIssue = {
+        ...issue,
+        repository,
+        milestone: issue.milestone || null,
+        issueType: issue.issueType || null,
+        repositoryId: input.repositoryId,
+      };
+
+      setRepos((prev) =>
+        prev.map((repo) =>
+          repo.id === input.repositoryId
+            ? {
+                ...repo,
+                issues: [normalizedIssue, ...repo.issues],
+              }
+            : repo
+        )
+      );
+
+      if (input.projectV2Ids?.length) {
+        setProjects((prev) =>
+          prev.map((project) => {
+            if (!input.projectV2Ids.includes(project.id)) return project;
+            const projectIssue = {
+              id: issue.id,
+              number: issue.number,
+              title: issue.title,
+              url: issue.url,
+              state: issue.state,
+              createdAt: issue.createdAt,
+              repository: repository.nameWithOwner,
+              project_status: null,
+              issueType: issue.issueType || null,
+              project_item_id: projectV2Items[project.id] || null,
+            };
+            return {
+              ...project,
+              issues: [projectIssue, ...project.issues],
+            };
+          })
+        );
+      }
+
+      if (issue.issueType) {
+        setIssueTypes((prev) => {
+          if (prev.some((t) => t.id === issue.issueType.id)) return prev;
+          return [...prev, issue.issueType];
+        });
+      }
+
+      setIsCreateIssueOpen(false);
+    } catch (err) {
+      setCreateIssueError(err.message || String(err));
+      throw err;
+    } finally {
+      setCreatingIssue(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     setError("");
+    setIsCreateIssueOpen(false);
+    setCreateIssueError("");
     setRepos([]);
     setProjects([]);
     setIssueTypes([]);
@@ -255,6 +348,18 @@ export default function App() {
           theme={theme}
           density={density}
           sidebarOpen={sidebarOpen}
+          onNewIssue={handleOpenCreateIssue}
+          canCreateIssue={canCreateIssue}
+        />
+
+        <CreateIssueModal
+          open={isCreateIssueOpen}
+          onClose={handleCloseCreateIssue}
+          repos={repos}
+          issueTypes={issueTypes}
+          onSubmit={handleCreateIssueSubmit}
+          submitting={creatingIssue}
+          error={createIssueError}
         />
 
       <main className="max-w-7xl mx-auto px-4 py-6">
