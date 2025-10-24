@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from "react";
-import { Github, Loader2, RefreshCcw, Sun, Moon, Monitor, Maximize2, Minimize2, Plus } from "lucide-react";
+import { Github, Loader2, RefreshCcw, Sun, Moon, Monitor, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
@@ -17,8 +17,6 @@ export default function AppHeader({
   theme,
   density,
   sidebarOpen,
-  onNewIssue,
-  canCreateIssue,
 }) {
   return (
     <header className="sticky top-0 z-10 bg-white/80 backdrop-blur shadow-sm">
@@ -62,14 +60,6 @@ export default function AppHeader({
                   <span>Load</span>
                 </>
               )}
-            </Button>
-            <Button
-              className="bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-500"
-              onClick={onNewIssue}
-              disabled={!canCreateIssue}
-            >
-              <Plus className="w-4 h-4" />
-              <span>New issue</span>
             </Button>
             <button onClick={cycleTheme} title={`Theme: ${theme}`} className="p-2 border rounded">
               {theme === "dark" ? (
