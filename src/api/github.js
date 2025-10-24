@@ -31,6 +31,47 @@ export const ORG_REPOS_ISSUES = `
           name
           nameWithOwner
           url
+          assignableUsers(first: 30) {
+            nodes {
+              id
+              login
+              avatarUrl
+              url
+            }
+          }
+          labels(first: 50) {
+            nodes {
+              id
+              name
+              description
+              color
+            }
+          }
+          milestones(first: 30, states: [OPEN]) {
+            nodes {
+              id
+              title
+              description
+              dueOn
+              state
+              url
+            }
+          }
+          projects(first: 20, states: [OPEN]) {
+            nodes {
+              id
+              name
+              number
+            }
+          }
+          projectsV2(first: 20) {
+            nodes {
+              id
+              title
+              number
+              url
+            }
+          }
           issues(first: 100, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN, CLOSED]) {
             nodes {
               id
@@ -41,7 +82,7 @@ export const ORG_REPOS_ISSUES = `
               state
               createdAt
               closedAt
-              repository { nameWithOwner url }
+              repository { id nameWithOwner url }
               assignees(first: 10) { nodes { login avatarUrl url } }
               labels(first: 20) { nodes { id name color } }
               milestone { id title url dueOn description }
@@ -233,6 +274,36 @@ export async function fetchIssueTypes(token, org, options = {}) {
   return out;
 }
 
+const CREATE_ISSUE_MUTATION = `
+  mutation CreateIssue($input: CreateIssueInput!) {
+    createIssue(input: $input) {
+      issue {
+        id
+        number
+        title
+        body
+        url
+        state
+        createdAt
+        closedAt
+        repository { id nameWithOwner url }
+        assignees(first: 10) { nodes { login avatarUrl url } }
+        labels(first: 20) { nodes { id name color } }
+        milestone { id title url dueOn description }
+        issueType { id name color }
+      }
+    }
+  }
+`;
+
+const ADD_PROJECT_V2_ITEM = `
+  mutation AddProjectV2Item($projectId: ID!, $contentId: ID!) {
+    addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+      item { id }
+    }
+  }
+`;
+
 export const ISSUE_WITH_TIMELINE = `
   query IssueWithTimeline($owner: String!, $name: String!, $number: Int!, $after: String) {
     repository(owner: $owner, name: $name) {
@@ -341,6 +412,62 @@ export async function fetchIssueWithTimeline(token, owner, repo, number, options
   return issue;
 }
 
+export async function createIssue(token, payload) {
+  const {
+    repositoryId,
+    title,
+    body,
+    assigneeIds = [],
+    labelIds = [],
+    milestoneId,
+    projectIds = [],
+    issueTypeId,
+    projectV2Ids = [],
+  } = payload || {};
+
+  if (!repositoryId) {
+    throw new Error("Repository is required");
+  }
+  if (!title) {
+    throw new Error("Title is required");
+  }
+
+  const input = {
+    repositoryId,
+    title,
+  };
+  if (body) input.body = body;
+  if (assigneeIds.length) input.assigneeIds = assigneeIds;
+  if (labelIds.length) input.labelIds = labelIds;
+  if (milestoneId) input.milestoneId = milestoneId;
+  if (projectIds.length) input.projectIds = projectIds;
+  if (issueTypeId) input.issueTypeId = issueTypeId;
+
+  const data = await githubGraphQL(token, CREATE_ISSUE_MUTATION, { input });
+  const issueNode = data?.createIssue?.issue;
+  if (!issueNode) {
+    throw new Error("Failed to create issue");
+  }
+  const issue = {
+    ...issueNode,
+    assignees: issueNode.assignees?.nodes || [],
+    labels: issueNode.labels?.nodes || [],
+    repositoryId: repositoryId,
+  };
+
+  const projectV2Items = {};
+  for (const projectId of projectV2Ids || []) {
+    const added = await githubGraphQL(token, ADD_PROJECT_V2_ITEM, {
+      projectId,
+      contentId: issue.id,
+    });
+    const itemId = added?.addProjectV2ItemById?.item?.id || null;
+    projectV2Items[projectId] = itemId;
+  }
+
+  return { issue, projectV2Items };
+}
+
 // Aggregate org repos + issues with caching
 export async function fetchOrgReposIssues(token, org, options = {}) {
   const { swr = false, onUpdate } = options;
@@ -372,6 +499,37 @@ export async function fetchOrgReposIssues(token, org, options = {}) {
       name: n.name,
       url: n.url,
       nameWithOwner: n.nameWithOwner,
+      assignableUsers: (n.assignableUsers?.nodes || []).map(u => ({
+        id: u.id,
+        login: u.login,
+        avatarUrl: u.avatarUrl,
+        url: u.url,
+      })),
+      availableLabels: (n.labels?.nodes || []).map(l => ({
+        id: l.id,
+        name: l.name,
+        description: l.description,
+        color: l.color,
+      })),
+      availableMilestones: (n.milestones?.nodes || []).map(m => ({
+        id: m.id,
+        title: m.title,
+        description: m.description,
+        dueOn: m.dueOn,
+        state: m.state,
+        url: m.url,
+      })),
+      availableProjects: (n.projects?.nodes || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        number: p.number,
+      })),
+      availableProjectsV2: (n.projectsV2?.nodes || []).map(p => ({
+        id: p.id,
+        title: p.title,
+        number: p.number,
+        url: p.url,
+      })),
       issues: (n.issues?.nodes || []).map(i => ({
         id: i.id,
         number: i.number,
@@ -381,6 +539,7 @@ export async function fetchOrgReposIssues(token, org, options = {}) {
         state: i.state,
         createdAt: i.createdAt,
         closedAt: i.closedAt,
+        repositoryId: n.id,
         repository: i.repository,
         assignees: i.assignees?.nodes || [],
         labels: i.labels?.nodes || [],
