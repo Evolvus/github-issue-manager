@@ -1,5 +1,405 @@
 const GQL_ENDPOINT = "https://api.github.com/graphql";
+import YAML from "yaml";
 import { getWithTTL, setWithTTL, cacheGetEntry, isFresh } from "../cache/cache";
+
+const GITHUB_API_VERSION = "2022-11-28";
+const GITHUB_ACCEPT_HEADER = "application/vnd.github+json";
+
+const githubRestHeaders = (token) => ({
+  Authorization: `Bearer ${token}`,
+  Accept: GITHUB_ACCEPT_HEADER,
+  "X-GitHub-Api-Version": GITHUB_API_VERSION,
+});
+
+const decodeBase64 = (value) => {
+  if (!value) return "";
+  const globalObj = typeof globalThis !== "undefined" ? globalThis : {};
+
+  const decodeWithAtob = () => {
+    if (typeof globalObj.atob !== "function") return null;
+    let binary = "";
+    try {
+      binary = globalObj.atob(value);
+    } catch {
+      return null;
+    }
+    try {
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      if (typeof TextDecoder === "function") {
+        return new TextDecoder("utf-8").decode(bytes);
+      }
+      return decodeURIComponent(
+        Array.prototype.map
+          .call(binary, (c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+          .join("")
+      );
+    } catch {
+      return binary;
+    }
+  };
+
+  const fromAtob = decodeWithAtob();
+  if (fromAtob !== null) return fromAtob;
+
+  const nodeBuffer = globalObj.Buffer;
+  if (nodeBuffer && typeof nodeBuffer.from === "function") {
+    try {
+      return nodeBuffer.from(value, "base64").toString("utf8");
+    } catch {
+      return "";
+    }
+  }
+
+  return "";
+};
+
+const slugify = (value) => {
+  if (!value) return "";
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+const normalizeFormOption = (option, index) => {
+  if (!option) return null;
+  if (typeof option === "string") {
+    const trimmed = option.trim();
+    if (!trimmed) return null;
+    return {
+      id: `option-${index}`,
+      label: trimmed,
+      value: trimmed,
+      description: "",
+      required: false,
+      default: false,
+    };
+  }
+  if (typeof option !== "object") return null;
+  const label = option.label || option.name || option.value || `Option ${index + 1}`;
+  const value = option.value || option.label || option.name || label;
+  return {
+    id: option.id || `option-${index}`,
+    label,
+    value,
+    description: option.description || "",
+    required: !!option.required,
+    default: !!option.default || !!option.checked,
+  };
+};
+
+const normalizeFormFields = (body) => {
+  if (!Array.isArray(body)) return [];
+  return body
+    .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+      const type = (item.type || "").toLowerCase();
+      const attrs = item.attributes || {};
+      const validations = item.validations || {};
+      const baseId =
+        item.id ||
+        attrs.id ||
+        slugify(attrs.label || attrs.name || attrs.title || "") ||
+        `field-${index}`;
+
+      if (type === "markdown") {
+        return {
+          id: baseId,
+          type: "markdown",
+          content: attrs.value || "",
+        };
+      }
+
+      if (type === "attachments" || type === "contributors") {
+        return {
+          id: baseId,
+          type,
+          label:
+            attrs.label ||
+            (type === "attachments" ? "Attachments" : "Contributors"),
+          description: attrs.description || "",
+        };
+      }
+
+      const field = {
+        id: baseId,
+        type,
+        label: attrs.label || attrs.name || attrs.title || "",
+        name: attrs.name || "",
+        description: attrs.description || "",
+        required: !!attrs.required,
+        placeholder: attrs.placeholder || "",
+        options: [],
+        multiple: !!attrs.multiple,
+        validations: {
+          min: validations.min ?? attrs.min ?? null,
+          max: validations.max ?? attrs.max ?? null,
+          pattern: validations.pattern || attrs.pattern || "",
+        },
+        defaultValue: undefined,
+      };
+
+      if (type === "checkboxes" || type === "dropdown" || type === "multiselect") {
+        const rawOptions = Array.isArray(attrs.options) ? attrs.options : [];
+        const normalizedOptions = rawOptions
+          .map((option, optIndex) => normalizeFormOption(option, optIndex))
+          .filter(Boolean);
+        field.options = normalizedOptions;
+
+        if (type === "dropdown") {
+          const isMultiple = field.multiple || attrs.multiple === true;
+          field.multiple = isMultiple;
+          let defaultValue = attrs.default;
+          if (typeof defaultValue === "number" && normalizedOptions[defaultValue]) {
+            defaultValue = normalizedOptions[defaultValue].value;
+          } else if (typeof defaultValue === "string") {
+            const match = normalizedOptions.find(
+              (opt) => opt.value === defaultValue || opt.label === defaultValue
+            );
+            defaultValue = match ? match.value : defaultValue;
+          } else if (Array.isArray(defaultValue)) {
+            defaultValue = defaultValue
+              .map((val) => {
+                const match = normalizedOptions.find(
+                  (opt) => opt.value === val || opt.label === val
+                );
+                return match ? match.value : val;
+              })
+              .filter(Boolean);
+          } else {
+            defaultValue = null;
+          }
+          if (!defaultValue) {
+            const optionDefault = normalizedOptions.find((opt) => opt.default);
+            if (optionDefault) {
+              defaultValue = optionDefault.value;
+            }
+          }
+          if (isMultiple) {
+            const defaults = Array.isArray(defaultValue)
+              ? defaultValue
+              : defaultValue
+              ? [defaultValue]
+              : [];
+            const optionDefaults = normalizedOptions
+              .filter((opt) => opt.default)
+              .map((opt) => opt.value);
+            field.defaultValue = Array.from(new Set([...defaults, ...optionDefaults]));
+          } else {
+            field.defaultValue =
+              typeof defaultValue === "string" ? defaultValue : "";
+          }
+        } else {
+          const explicitDefaults = Array.isArray(attrs.default)
+            ? attrs.default
+            : attrs.default
+            ? [attrs.default]
+            : [];
+          const optionDefaults = normalizedOptions
+            .filter((opt) => opt.default)
+            .map((opt) => opt.value);
+          field.defaultValue = Array.from(
+            new Set([
+              ...explicitDefaults.map((val) => {
+                const match = normalizedOptions.find(
+                  (opt) => opt.value === val || opt.label === val
+                );
+                return match ? match.value : val;
+              }),
+              ...optionDefaults,
+            ])
+          );
+        }
+        return field;
+      }
+
+      switch (type) {
+        case "textarea":
+        case "input":
+        case "number": {
+          const defaultValue =
+            attrs.default ?? attrs.value ?? attrs.placeholder ?? "";
+          field.defaultValue =
+            defaultValue != null ? String(defaultValue) : "";
+          return field;
+        }
+        case "confirmations": {
+          field.type = "checkboxes";
+          field.options = [
+            {
+              id: `${baseId}-confirm`,
+              label: attrs.label || attrs.name || "Confirmation",
+              value: "confirmed",
+              description: attrs.description || "",
+              required: true,
+              default: !!attrs.default,
+            },
+          ];
+          field.defaultValue = attrs.default ? ["confirmed"] : [];
+          return field;
+        }
+        default: {
+          field.defaultValue = attrs.default ?? "";
+          return field;
+        }
+      }
+    })
+    .filter(Boolean);
+};
+
+const renderIssueFormBody = (form) => {
+  if (!form || !Array.isArray(form.body)) return "";
+  const sections = [];
+  for (const item of form.body) {
+    if (!item || typeof item !== "object") continue;
+    const type = (item.type || "").toLowerCase();
+    const attrs = item.attributes || {};
+    const requiredText = attrs.required ? " *(required)*" : "";
+
+    if (type === "markdown") {
+      if (attrs.value) sections.push(attrs.value.trim());
+      continue;
+    }
+
+    const parts = [];
+    if (attrs.label) {
+      parts.push(`### ${attrs.label}${requiredText}`);
+    } else if (attrs.name) {
+      parts.push(`### ${attrs.name}${requiredText}`);
+    }
+    if (attrs.description) {
+      parts.push(attrs.description.trim());
+    }
+
+    switch (type) {
+      case "textarea":
+      case "input":
+      case "number": {
+        if (attrs.placeholder) {
+          parts.push(`> ${attrs.placeholder}`);
+        }
+        if (attrs.default) {
+          parts.push(`Default: ${attrs.default}`);
+        }
+        break;
+      }
+      case "dropdown":
+      case "multiselect": {
+        const options = attrs.options || [];
+        if (options.length) {
+          parts.push(
+            "Options:\n" +
+              options
+                .map((opt) => {
+                  const optLabel = typeof opt === "string" ? opt : opt.label;
+                  return optLabel ? `- ${optLabel}` : null;
+                })
+                .filter(Boolean)
+                .join("\n")
+          );
+        }
+        break;
+      }
+      case "checkboxes": {
+        const options = attrs.options || [];
+        if (options.length) {
+          parts.push(
+            options
+              .map((opt) => {
+                const optLabel = typeof opt === "string" ? opt : opt.label;
+                if (!optLabel) return null;
+                const required = opt.required ? " *(required)*" : "";
+                return `- [ ] ${optLabel}${required}`;
+              })
+              .filter(Boolean)
+              .join("\n")
+          );
+        }
+        break;
+      }
+      case "contributors": {
+        parts.push("Add relevant contributors.");
+        break;
+      }
+      case "attachments": {
+        parts.push("Attach supporting files as needed.");
+        break;
+      }
+      default: {
+        if (!parts.length && attrs.placeholder) {
+          parts.push(attrs.placeholder);
+        }
+      }
+    }
+
+    const content = parts.filter(Boolean).join("\n\n");
+    if (content) sections.push(content.trim());
+  }
+  return sections.join("\n\n").trim();
+};
+
+const fetchIssueFormTemplates = async (token, owner, name) => {
+  try {
+    const dirRes = await fetch(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+        name
+      )}/contents/.github/ISSUE_TEMPLATE`,
+      {
+        headers: githubRestHeaders(token),
+      }
+    );
+    if (!dirRes.ok) return [];
+    const items = await dirRes.json();
+    if (!Array.isArray(items)) return [];
+    const templates = [];
+    for (const item of items) {
+      if (!item || item.type !== "file") continue;
+      if (!/\.ya?ml$/i.test(item.name)) continue;
+      const fileRes = await fetch(item.url, { headers: githubRestHeaders(token) });
+      if (!fileRes.ok) continue;
+      const fileJson = await fileRes.json();
+      const content = decodeBase64(fileJson.content || "");
+      if (!content.trim()) continue;
+      let parsed;
+      try {
+        parsed = YAML.parse(content);
+      } catch {
+        continue;
+      }
+      if (!parsed || typeof parsed !== "object") continue;
+      const formFields = normalizeFormFields(parsed.body);
+      const body = renderIssueFormBody(parsed);
+      templates.push({
+        name: parsed.name || item.name.replace(/\.ya?ml$/i, ""),
+        description: parsed.description || "",
+        body,
+        title: parsed.title || "",
+        formFields,
+        isForm: true,
+      });
+    }
+    return templates;
+  } catch {
+    return [];
+  }
+};
+
+const templateIdentifiersMatch = (template, title, name, desc) => {
+  return (
+    (template.title || "").toLowerCase() === title &&
+    (template.name || "").toLowerCase() === name &&
+    (template.description || "").toLowerCase() === desc
+  );
+};
+
+const templateMapHasEquivalent = (map, title, name, desc) => {
+  for (const value of map.values()) {
+    if (templateIdentifiersMatch(value, title, name, desc)) {
+      return true;
+    }
+  }
+  return false;
+};
 
 export async function githubGraphQL(token, query, variables = {}) {
   const res = await fetch(GQL_ENDPOINT, {
@@ -114,6 +514,77 @@ export const PROJECT_ITEMS = `
               }
             }
           }
+        }
+      }
+    }
+  }
+`;
+
+export const REPO_ISSUE_METADATA = `
+  query RepoIssueMetadata($owner: String!, $name: String!) {
+    repository(owner: $owner, name: $name) {
+      id
+      name
+      nameWithOwner
+      url
+      issueTemplates {
+        name
+        body
+        about
+        title
+      }
+      labels(first: 100) {
+        nodes {
+          id
+          name
+          color
+          description
+        }
+      }
+      assignableUsers(first: 50) {
+        nodes {
+          id
+          login
+          name
+          avatarUrl
+          url
+        }
+      }
+      milestones(first: 50, states: [OPEN]) {
+        nodes {
+          id
+          number
+          title
+          state
+          dueOn
+          description
+        }
+      }
+      projectsV2(first: 20) {
+        nodes {
+          id
+          number
+          title
+          url
+        }
+      }
+    }
+  }
+`;
+
+const CREATE_ISSUE_MUTATION = `
+  mutation CreateIssue($input: CreateIssueInput!) {
+    createIssue(input: $input) {
+      issue {
+        id
+        number
+        title
+        url
+        createdAt
+        state
+        repository {
+          nameWithOwner
+          url
         }
       }
     }
@@ -337,6 +808,106 @@ export async function fetchIssueWithTimeline(token, owner, repo, number, options
   if (issue) {
     issue.timelineItems = timeline;
     await setWithTTL(cacheKey, issue, 24 * 60 * 60 * 1000); // 24 hours
+  }
+  return issue;
+}
+
+export async function fetchRepoIssueMetadata(token, owner, name) {
+  const data = await githubGraphQL(token, REPO_ISSUE_METADATA, { owner, name });
+  const repo = data.repository;
+  if (!repo) {
+    throw new Error("Repository not found or access denied.");
+  }
+
+  const graphTemplates =
+    (repo.issueTemplates || []).map((template) => ({
+      name: template.name,
+      body: template.body || "",
+      description: template.about || "",
+      title: template.title || "",
+    })) || [];
+
+  let restTemplates = [];
+  try {
+    const res = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/issues/templates`, {
+      headers: githubRestHeaders(token),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const templatesArray = Array.isArray(json?.templates)
+        ? json.templates
+        : Array.isArray(json)
+        ? json
+        : [];
+      restTemplates = templatesArray.map((template) => ({
+        name: template.title || template.name || "",
+        body: template.body || "",
+        description: template.description || template.about || "",
+        title: template.title || template.name || "",
+      }));
+    }
+  } catch {
+    // ignore REST fallback errors and rely on GraphQL data instead
+  }
+
+  let formTemplates = [];
+  try {
+    formTemplates = await fetchIssueFormTemplates(token, owner, name);
+  } catch {
+    formTemplates = [];
+  }
+
+  const templateMap = new Map();
+  [...graphTemplates, ...restTemplates, ...formTemplates].forEach((template, index) => {
+    const title = (template.title || "").toLowerCase();
+    const name = (template.name || "").toLowerCase();
+    const desc = (template.description || "").toLowerCase();
+    if (templateMapHasEquivalent(templateMap, title, name, desc)) return;
+    const key = [title, name, desc].filter(Boolean).join("|") || `template-${index}`;
+    templateMap.set(key, template);
+  });
+
+  return {
+    id: repo.id,
+    name: repo.name,
+    nameWithOwner: repo.nameWithOwner,
+    url: repo.url,
+    issueTemplates: templateMap.size ? Array.from(templateMap.values()) : graphTemplates,
+    labels: (repo.labels?.nodes || []).map((label) => ({
+      id: label.id,
+      name: label.name,
+      color: label.color,
+      description: label.description || "",
+    })),
+    assignees: (repo.assignableUsers?.nodes || []).map((user) => ({
+      id: user.id,
+      login: user.login,
+      name: user.name || "",
+      avatarUrl: user.avatarUrl,
+      url: user.url,
+    })),
+    milestones: (repo.milestones?.nodes || []).map((mile) => ({
+      id: mile.id,
+      number: mile.number,
+      title: mile.title,
+      state: mile.state,
+      dueOn: mile.dueOn,
+      description: mile.description || "",
+    })),
+    projects: (repo.projectsV2?.nodes || []).map((proj) => ({
+      id: proj.id,
+      number: proj.number,
+      title: proj.title,
+      url: proj.url,
+    })),
+  };
+}
+
+export async function createIssue(token, input) {
+  const data = await githubGraphQL(token, CREATE_ISSUE_MUTATION, { input });
+  const issue = data?.createIssue?.issue;
+  if (!issue) {
+    throw new Error("Failed to create issue.");
   }
   return issue;
 }

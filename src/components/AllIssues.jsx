@@ -3,11 +3,12 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import MultiSelect from "./ui/MultiSelect";
-import { Download, Search, X } from "lucide-react";
+import { Download, Search, X, Plus } from "lucide-react";
 import { downloadIssuesExcel } from "../utils/exportExcel";
 import IssueCard, { IssueOverlayCard } from "./IssueCard";
 import useAppStore from "../store";
 import { fetchIssueWithTimeline } from "../api/github";
+import { useNavigate } from "react-router-dom";
 
 // Excel export handled via utils/exportExcel
 
@@ -20,6 +21,7 @@ export default function AllIssues({
   milestoneOptions,
   token,
 }) {
+  const navigate = useNavigate();
   const {
     query,
     setQuery,
@@ -119,7 +121,16 @@ export default function AllIssues({
           <MultiSelect options={tagOptions} value={filterTag} onChange={setFilterTag} placeholder="Tags" />
           <MultiSelect options={milestoneOptions} value={filterMilestone} onChange={setFilterMilestone} placeholder="Milestones" />
         </div>
-        <div className="justify-self-end">
+        <div className="justify-self-end flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={() => navigate("/new-issue")}
+            aria-label="Create new issue"
+            className="gap-0 h-10 w-10 rounded-full bg-black text-white justify-center px-0 py-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="sr-only">New issue</span>
+          </Button>
           <Button onClick={() => downloadIssuesExcel(filteredAllIssues, "all-issues.xlsx")} className="text-sm whitespace-nowrap">
             <Download className="w-4 h-4"/> Download
           </Button>

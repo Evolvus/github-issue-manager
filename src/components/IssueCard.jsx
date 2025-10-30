@@ -4,6 +4,7 @@ import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import TimeAgo from "./TimeAgo";
 import { Maximize2, Minimize2 } from "lucide-react";
 
@@ -475,6 +476,7 @@ export function ExpandedIssueCard({ issue }) {
           <div className="text-sm text-gray-500 font-medium mb-2">Description:</div>
           <div className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
             <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
               components={{
                 // Customize markdown components for better styling
                 p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -867,6 +869,7 @@ export function IssueOverlayCard({ issue }) {
           <div className="text-sm text-gray-500 font-medium mb-2">Description:</div>
           <div className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
             <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
               components={{
                 p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                 h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,

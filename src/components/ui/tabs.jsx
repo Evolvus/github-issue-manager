@@ -14,6 +14,7 @@ export function TabsTrigger({ value, children }) {
   const active = v === value;
   return (
     <button
+      type="button"
       onClick={() => setValue(value)}
       className={`px-3 py-2 rounded-xl text-sm ${active ? "bg-white shadow font-semibold" : "text-gray-600"}`}
     >

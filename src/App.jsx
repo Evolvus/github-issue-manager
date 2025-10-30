@@ -14,6 +14,7 @@ const ByTags = lazy(() => import("./components/ByTags"));
 const ProjectBoard = lazy(() => import("./components/ProjectBoard"));
 const Sprints = lazy(() => import("./components/Sprints"));
 const AllIssues = lazy(() => import("./components/AllIssues"));
+const CreateIssue = lazy(() => import("./components/CreateIssue"));
 
 /**
  * GitHub Issues Manager (React)
@@ -319,6 +320,14 @@ export default function App() {
                 milestoneOptions={milestoneOptions}
                 issueTypeOptions={issueTypeOptions}
                 token={token}
+              />
+            } />
+            <Route path="/new-issue" element={
+              <CreateIssue
+                org={org}
+                token={token}
+                repos={repos}
+                loadData={loadData}
               />
             } />
             <Route path="*" element={<Navigate to="/" replace />} />
